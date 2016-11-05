@@ -114,6 +114,7 @@ var dataModule = function(){
   };
 
   // delete record in selected array
+  // delete record related to the parent too
   var deleteItem = function deleteItem(type, id){
     var delItem = function(array,id){
       var ref = idxArr(array, id);
@@ -266,7 +267,7 @@ function getData(){
 		listContainer.appendChild(li);
 	};
 
-	var dictObj = $.parseJSON(#server(%BI.iKnow.iKnow.GetDictionaries())#);
+	//var dictObj = $.parseJSON(#server(%BI.iKnow.iKnow.GetDictionaries())#);
 	var thisObj = {"cElem": "dictList", "parentId": null};
 	dictObj.forEach(container, thisObj);
 }
@@ -290,14 +291,7 @@ function buildSingleItem(containerId, type, item){
     var remBtn = document.createElement("button");
     remBtn.className = "button";
     remBtn.innerHTML = "X";
-    remBtn.onclick = function(){
-      var thisLI = listElem;
-      var parentList = parentCont;
-      return function (){
-        updateObj(thisLI);
-        //parentList.removeChild(thisLI);
-      };
-    }();
+    remBtn.onclick = function() {alert('Removed!')};
 
     div.appendChild(elem);
     div.appendChild(remBtn);
@@ -311,11 +305,15 @@ function buildSingleItem(containerId, type, item){
   li.data_id = item.id;
   li.data_type = item.type;
   li.onclick = function(){
-    return function(){
-      var subType = (type=='dictionary') ? 'item' : 'terms';
-      var parentId = item.id;
-      populateContainer(container, subType, parentId);
-    };
+    if (containerId=='termList') { return null; }
+    else {
+      return function(){
+        var subType = (type=='dictionary') ? 'item' : 'terms';
+        var containerName = (type=='dictionary') ? 'itemList' : 'termList';
+        var parentId = item.id;
+        populateContainer(containerName, subType, parentId);
+      };
+    }
   }();
 
   // create labels
@@ -326,9 +324,9 @@ function buildSingleItem(containerId, type, item){
 
 function populateContainer(container, type, selectedId){
   var list = data.getRecord(type, selectedId);
-  var containerList = ['','',''];
+  var containerList = ['dictList','itemList','termList'];
   list.forEach(function(r){
-    buildSingleItem(containerList[i], type, r);
+    buildSingleItem(container, type, r);
   });
 }
 </script>

@@ -1,0 +1,18 @@
+RSS List
+
+http://english.astroawani.com/rss/latest/public
+http://www.bharian.com.my/terkini.xml
+http://www.bernama.com/bernama/v8/rss/english.php
+http://www.theborneopost.com/feed/
+http://www.freemalaysiatoday.com/feed/
+http://www.hmetro.com.my/utama.xml
+http://www.hmetro.com.my/setempat.xml
+http://www.themalaymailonline.com/feed/rss/malaysia
+http://www.malaysia-chronicle.com/feed/
+http://www.nst.com.my/latest.xml
+http://feeds.theedgemarkets.com/theedgemarkets/mytopstories.rss
+http://www.thestar.com.my/rss/editors-choice/main/
+http://www.thestar.com.my/rss/editors-choice/news/
+http://www.thesundaily.my/rss/latest
+http://www.thesundaily.my/rss/highlights
+http://www.thesundaily.my/rss/local

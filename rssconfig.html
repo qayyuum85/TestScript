@@ -1,0 +1,448 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" charset="UTF-8" content="IE=edge">
+<script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+<script type="text/javascript" src="js/es5shims.js"></script>
+<script type="text/javascript" src="js/tab.js"></script>
+<title>  RSS Configuration </title>
+<script type='text/javascript'>
+function toArray(obj) {
+  var array = [];
+  // iterate backwards ensuring that length is an UInt32
+  for (var i = obj.length >>> 0; i--;) {
+    array[i] = obj[i];
+  }
+  return array;
+}
+
+function resizeContainer(){
+  // set frameCon height
+  var bodyH = document.body.clientHeight;
+  var mainTitleH = document.getElementById("topBar").clientHeight;
+  var mainCon = document.getElementById("mainCon");
+  mainCon.style.height = (bodyH - mainTitleH) + "px";
+}
+
+function toggleType(){
+  var trRSS = document.getElementById("rssLinks");
+  var selVal = document.getElementById("selType").value;
+  if (selVal=="RSS") {
+    trRSS.style.display = "table-row";
+  }
+  else {
+    trRSS.style.display = "none";
+  }
+}
+
+function addNewRSS(name, link) {
+  var div = document.createElement("div");
+  div.className = "itemLinks";
+
+  var txtName = document.createElement("input");
+  txtName.className = "txtField catName";
+  txtName.type = "text";
+  txtName.value = name || "";
+
+  var txtAddr = document.createElement("input");
+  txtAddr.className = "txtField addressLink";
+  txtAddr.type = "text";
+  txtAddr.style.marginLeft="3px";
+  txtAddr.value = link || "";
+
+  var btnRem = document.createElement("input");
+  btnRem.value = "x";
+  btnRem.type = "button";
+  btnRem.className = "button";
+  btnRem.title ="Remove";
+  btnRem.style.marginLeft="3px";
+  btnRem.onclick = function(){
+    var thisBtn = btnRem;
+    return function () {
+      remThisLink(thisBtn);
+    }
+  }();
+
+  div.appendChild(txtName);
+  div.appendChild(txtAddr);
+  div.appendChild(btnRem);
+
+  var linkHolder = document.getElementById("linkHolder");
+  linkHolder.appendChild(div);
+}
+
+function remThisLink(obj) {
+  var parent, container;
+  container = obj.parentElement;
+  parent = container.parentElement;
+  var itemLinksElemList = document.getElementsByClassName("itemLinks");
+  if (itemLinksElemList.length == 1 ){
+    container.children[0].value = ""; // Name textbox
+    container.children[1].value = ""; // Link textbox
+  }
+  else {
+    parent.removeChild(container);
+  }
+}
+
+function procElem(inputArr, f, saveObj) {
+  if (f && typeof f === "function") {
+    inputArr.forEach(f, saveObj);
+  }
+}
+function testElem(inputArr, f) {
+  if (f && typeof f === "function") {
+     return inputArr.filter(f);
+  }
+}
+
+function getValue(col, colIdx) {
+  var el = document.getElementById(col);
+  var type = function (obj) {
+    if( Object.prototype.toString.call(obj) === '[object Array]' ) {
+      return true;
+    }
+    else {
+      return false;
+    }
+  }(this);
+  if ((el.nodeName === "INPUT" && el.type === "text")||(el.nodeName === "TEXTAREA")) {
+    if (type == true) {
+      this.push(el.value);
+    }else {
+      this[col] = el.value;
+    }
+  }
+  else if (el.nodeName === "SELECT") {
+    if  (type == true) {
+      this.push(el.options[el.selectedIndex].value);
+    }else {
+      this[col] = el.options[el.selectedIndex].value;
+    }
+  }
+  else {
+    //do Nothing
+  }
+}
+
+function setValue(col, colIdx) {
+  var el = document.getElementById(col);
+  if ((el.nodeName === "INPUT" && el.type === "text")||(el.nodeName === "TEXTAREA")) {
+    el.value = this[colIdx] || "";
+  }
+  else if (el.nodeName === "SELECT") {
+    el.value = this[colIdx];
+  }
+  else {
+    //do Nothing
+  }
+}
+
+function clearValue(col) {
+  var el = document.getElementById(col);
+  if ((el.nodeName === "INPUT" && el.type === "text")||(el.nodeName === "TEXTAREA")) {
+    el.value = "";
+  }
+  else if (el.nodeName === "SELECT") {
+    el.selectedIndex = 0;
+  }
+  else {
+    //do Nothing
+  }
+}
+function validateValue(col) {
+  var el = document.getElementById(col);
+  if ((el.nodeName === "INPUT" && el.type === "text")||(el.nodeName === "TEXTAREA")) {
+    if (el.value == "") {
+      return true;
+    }
+  }
+  else if (el.nodeName === "SELECT") {
+    if (el.selectedIndex == 0){
+      return true;
+    }
+  }
+  else {
+    //do Nothing
+  }
+  return false;
+}
+
+function loadConfig(id){
+  var configObj = a; // server call here
+  var inputIds = ['txtName','selType','txtDesc','txtFilter'];
+  procElem(inputIds, setValue, configObj);
+
+  if (configObj['selType'] == "RSS") {
+    configObj.rssLinks.forEach(function(item){
+      addNewRSS(item.name, item.link);
+    });
+  }
+}
+
+function saveConfig(type){
+  var saveObj = {};
+  var inputIds = ['txtName','selType','txtDesc','txtFilter'];
+  var getList = function getList(){
+    var itemLinksElemList = document.getElementsByClassName("itemLinks");
+    var list = Array.prototype.map.call(itemLinksElemList, function(container){
+      var name = container.children[0].value;
+      var link = container.children[1].value;
+
+      return {
+        name: name,
+        link: link
+      }
+    });
+
+    return list;
+  };
+
+  var validateList = function validateList(){
+    var itemLinksElemList = document.getElementsByClassName("itemLinks");
+    var test = Array.prototype.every.call(itemLinksElemList, function(container){
+      var name = container.children[0].value;
+      var link = container.children[1].value;
+
+      return (name!="" && link!="");
+    });
+
+    return test;
+  };
+
+  var validFields = ['txtName','selType'];
+  var validation = testElem(validFields, validateValue);
+  if (validation.length==0) {
+    procElem(inputIds, getValue, saveObj);
+  }
+  else {
+    alert('Field(s) marked with asterisk is compulsory.');
+    return;
+  }
+
+  var selVal = document.getElementById("selType").value;
+  if (selVal=="RSS") {
+    if (validateList()) {
+      saveObj["links"] = getList();
+    }
+    else {
+      alert('Cannot leave either name or links empty.');
+      return;
+    }
+  }
+
+  console.log(saveObj);
+  // remember to set id after new save to list
+}
+
+function deleteConfig(){
+  var r = confirm('Delete this configuration? This process is irreversible!');
+  if (r) {
+    alert('Deleted!');
+    clearAll();
+  }
+}
+
+function clearAll(){
+  var inputIds = ['txtName','selType','txtDesc','txtFilter'];
+  procElem(inputIds, clearValue);
+
+  // clear RSS Links
+  var itemLinksElemList = document.getElementsByClassName("itemLinks");
+  var stdArr = toArray(itemLinksElemList); // convert from live collection to standard array
+  var i, len = stdArr.length;
+  for (i=len; i>0; i--){
+    // have to reference to remove button since remThisLink function use Remove button as reference
+    remThisLink(stdArr[i-1].children[2]);
+  }
+
+  // hide RSS Links, as we resetting the form
+  toggleType();
+}
+
+function buildSingleItem(containerId, type, item){
+  // labels function definition
+  var listContainer = document.getElementById(containerId);
+  var li = document.createElement("li");
+
+  // create items
+  li.onclick = function(){
+    // selection onclick
+    loadConfig(itemId);
+  }();
+}
+
+var labels = function createLabels(type, id, value){
+  var elem, div = document.createElement("div");
+  elem = document.createElement("span");
+  elem.innerHTML = value;
+
+  return div;
+};
+
+function populateContainer(container, type, selectedId){
+  var reset = function resetContainer(){
+    var clearCon = function clearContainer(conName) {
+      var listHolder = document.getElementById(conName);
+      while (listHolder.firstChild) {
+        listHolder.removeChild(listHolder.firstChild);
+      }
+    };
+  };
+
+  var list = configs;
+  reset(type);
+  list.forEach(function(r){
+    buildSingleItem(container, type, r);
+  });
+}
+
+var configs = function getConfigurations(){
+  var data = a // server call here
+  return data;
+};
+</script>
+<!--CSS Definition Start-->
+<link rel="stylesheet" href="webStyle.css" type="text/css">
+<link rel="stylesheet" href="css/style.css" type="text/css">
+<script language=cache runat=server>
+d loadThemeCSS^%bi.SWr.WebThemeEdit
+</script>
+<!-- #include file = "general.csp" -->
+<link rel="stylesheet" href="css/wordcloud.css" type="text/css">
+<style>
+html, body {
+  height:100%;
+}
+table { border-collapse: collapse; }
+td#listPane {
+  width:15%;
+  vertical-align:top;
+  height: 100%;
+}
+td#editPane {
+  width:85%;
+  vertical-align:top;
+  height: 100%;
+}
+tr.vaTop { vertical-align:top; }
+tr.vaTop td { padding: 4px; }
+.divH { height: 100%; }
+table#mainTab >tr> td { border: 1px solid #cccccc; }
+td.inputFld { height: 30px; }
+.txtField { width: 99%; }
+ol li {  list-style: outside none none;  }
+ol { margin: 0px }
+ol, li {
+  border: 0px none;
+  padding: 0px;
+}
+li { margin:5px 5px 5px 2px; }
+li:hover { background-color: rgb(230, 238, 243); }
+.fullSize {
+  width:100%;
+  height:100%;
+}
+.catName { width: 100px; }
+.addressLink { width: 350px; }
+.itemLinks {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+</style>
+</head>
+
+<body onload="resizeContainer()">
+<div id="topBar" class="divMnHdr top" style="padding-right:10px">
+  <span>#($$$Text("Web Extraction Configuration"))#</span>
+</div>
+<div id="mainCon">
+  <table id="mainTab" class="fullSize" cellpadding="0" cellspacing="0">
+    <tr>
+        <td id="listPane">
+            <table class="fullSize" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td class="titleBar" style="border:1px solid #cccccc">#($$$Text("Configuration List"))#</div></td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #cccccc; vertical-align:top;">
+                        <div class="divH">
+                            <ol>
+                                <li>config 1</li>
+                            </ol>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td id="editPane">
+             <table class="fullSize" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td class="titleBar" style="border:1px solid #cccccc">#($$$Text("Setting"))#</td>
+                </tr>
+                <tr>
+                    <td style="vertical-align:top">
+                        <div style="height:100%;width:100%">
+                            <table style="width:100%" cellpadding="0" cellspacing="0">
+                                <tr class="vaTop">
+                                    <td class="inputFld" style="width:20%">#($$$Text("Name"))#<span style="color:red;">*</span></td>
+                                    <td style="width:80%"><input type="text" id="txtName" class="txtField"/></td>
+                                </tr>
+                                <tr class="vaTop">
+                                    <td class="inputFld" style="width:20%">#($$$Text("Type"))#<span style="color:red;">*</span></td>
+                                    <td style="width:80%">
+                                      <select id="selType" onchange="toggleType()">
+                                         <option value=""></option>
+                                         <option value="Twitter">#($$$Text("Twitter"))#</option>
+                                        <option value="RSS">#($$$Text("RSS"))#</option>
+                                      </select>
+                                    </td>
+                                </tr>
+                                <tr class="vaTop">
+                                    <td class="inputFld">#($$$Text("Description"))#</td>
+                                    <td><input type="text" id="txtDesc" class="txtField"/></td>
+                                </tr>
+                                <tr class="vaTop">
+                                    <td class="inputFld">
+                                      <div>#($$$Text("Filter"))#</div>
+                                      <div style="color:red;"><i>#($$$Text("Separate each keywords by semicolon (;)"))#</i></div>
+                                    </td>
+                                    <td class="inputFld">
+                                      <textarea id="txtFilter" class="txtField"  style="width:99%;height:100px;min-height:100px;"></textarea>
+                                    </td>
+                                </tr>
+                <tr id="rssLinks" class="vaTop" style="display:none;">
+                  <td class="inputFld">#($$$Text("RSS Link"))#</td>
+                  <td>
+                    <input type="button" value="Add New Link" class="button" onclick="addNewRSS()" />
+                    <div id="linkHolder">
+                      <div class="catName" style="display:inline-block"><b>#($$$Text("Name"))#</b></div><div class="addressLink" style="display:inline-block;padding-left:3px;"><b>#($$$Text("Link"))#</b></div>
+                      <div class="itemLinks">
+                        <input type="text" class="txtField catName" />
+                        <input type="text" class="txtField addressLink"/>
+                        <input type="button" class="button" value="x" title="Remove" onclick="remThisLink(this)" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                          </table>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="vertical-align:top;height:1%;">
+                        <div style="float:right;">
+                            <input type="button" value="Clear" class="button" onclick="clearAll()"/>
+                            <input type="button" value="Save" class="button" onclick="saveConfig(0)"/>
+                            <input type="button" value="Save As" class="button" onclick="saveConfig(1)"/>
+                            <input type="button" value="Delete" class="button" onclick="deleteConfig()"/>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+   </table>
+</div>
+</body>
+</html>

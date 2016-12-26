@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <!--Load the AJAX API-->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+
+      // Load the Visualization API and the corechart package.
+      google.charts.load('current', {'packages':['corechart','controls','table','map','geochart']});
+
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.charts.setOnLoadCallback(drawDashboard);
+      //google.charts.setOnLoadCallback(drawMap);
+      //google.charts.setOnLoadCallback(drawGeoMap);
+      // Callback that creates and populates a data table,
+      // instantiates the pie chart, passes in the data and
+      // draws it.
+      /*function drawDashboard() {
+        var drawGID = function drawGID() {
+          var query = new google.visualization.Query(
+            'https://docs.google.com/spreadsheets/d/17faaJlkN3H3OeGz2k-fdHAJp_beJFBC9gRCSuY-eu9E/gviz/tq?range=E15:F26');
+          query.send(responseHandler);
+        };
+
+
+        var responseHandler = function handleQueryResponse(response) {
+          if (response.isError()) {
+            alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+            return;
+          };
+
+          var data = response.getDataTable();
+          var chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+          chart.draw(data, { height: 400, width: '100%' });
+
+          var table = new google.visualization.Table(document.getElementById('table_div'));
+          table.draw(data, {showRowNumber: true, width: 500, height: '100%'});
+
+          var piechart = new google.visualization.PieChart(document.getElementById('piechart_div'));
+          piechart.draw(data, {width: 500, height: 400});
+        };
+
+        drawGID();
+
+        // Create a dashboard.
+        var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
+
+     }
+
+     function drawMap() {
+       var drawGID = function drawGID() {
+         var query = new google.visualization.Query(
+           'https://docs.google.com/spreadsheets/d/17faaJlkN3H3OeGz2k-fdHAJp_beJFBC9gRCSuY-eu9E/gviz/tq?range=A15:C26');
+         query.send(responseHandler);
+       };
+
+       var responseHandler = function handleQueryResponse(response) {
+         if (response.isError()) {
+           alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+           return;
+         };
+
+         var data = response.getDataTable();
+         var map = new google.visualization.Map(document.getElementById('map_div'));
+         map.draw(data, {width: 500})
+
+         var table = new google.visualization.Table(document.getElementById('table_div'));
+         table.draw(data, {showRowNumber: true, width: 500, height: '100%'});
+       };
+
+       drawGID();
+     }
+
+     function drawGeoMap(){
+       var drawGID = function drawGID() {
+         var query = new google.visualization.Query(
+           'https://docs.google.com/spreadsheets/d/17faaJlkN3H3OeGz2k-fdHAJp_beJFBC9gRCSuY-eu9E/gviz/tq?range=H15:J26');
+         query.send(responseHandler);
+       };
+
+       var responseHandler = function handleQueryResponse(response) {
+         if (response.isError()) {
+           alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+           return;
+         };
+
+         var data = response.getDataTable();
+         var geomap = new google.visualization.GeoChart(document.getElementById('geomap_div'));
+         geomap.draw(data, {resolution:'provinces', region:'MY' });
+       };
+
+       drawGID();
+     }*/
+
+     function drawDashboard(){
+       var genCharts = function genCharts(){
+         var data;
+         var drawGID = function drawGID() {
+           var query = new google.visualization.Query(
+             'https://docs.google.com/spreadsheets/d/17faaJlkN3H3OeGz2k-fdHAJp_beJFBC9gRCSuY-eu9E/gviz/tq?range=A1:F12');
+           query.send(responseHandler);
+         };
+
+         var responseHandler = function handleQueryResponse(response) {
+           if (response.isError()) {
+             alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+             return null;
+           }
+           else {
+             data = response.getDataTable();
+             genTable(data);
+             genMap(data);
+             genPieChart(data);
+             genColchart(data);
+           }
+         };
+         drawGID();
+       };
+
+       var genTable = function genTable(data){
+         var tableView = new google.visualization.DataView(data);
+         tableView.setColumns([0,3,4,5]);
+
+         var table = new google.visualization.Table(document.getElementById('table_div'));
+         table.draw(tableView, {showRowNumber: true, width: 800, height: '100%'});
+       };
+
+       var genMap = function genMap(data) {
+         var mapView = new google.visualization.DataView(data);
+         mapView.setColumns([1, 2]);
+
+         var map = new google.visualization.Map(document.getElementById('map_div'));
+         map.draw(mapView, {width: 500, height: 400, mapType:'normal'});
+
+         var geomapView =  new google.visualization.DataView(data);
+         geomapView.setColumns([1, 2, 3]);
+
+         var geomap = new google.visualization.GeoChart(document.getElementById('geomap_div'));
+         geomap.draw(geomapView, {width: 500, height: 400, region: 'MY', resolution:'provinces', region:'MY'});
+       };
+
+       var genPieChart = function genPieChart(data) {
+         var piechartView = new google.visualization.DataView(data);
+         piechartView.setColumns([0, 3]);
+
+         var piechartDengueCase = new google.visualization.PieChart(document.getElementById('piechart1_div'));
+         piechartDengueCase.draw(piechartView, {width: 400, height: 400, title: 'Dengue Cases in KL (2014)'});
+
+         var dengueHemorrhageView = new google.visualization.DataView(data);
+         dengueHemorrhageView.setColumns([0, 4]);
+
+         var piechartHemorrhagicCase = new google.visualization.PieChart(document.getElementById('piechart2_div'));
+         piechartHemorrhagicCase.draw(dengueHemorrhageView, {width: 400, height: 400, title: 'Dengue Hemorrhagic Cases in KL (2014)'});
+
+         var dengueDeathView = new google.visualization.DataView(data);
+         dengueDeathView.setColumns([0, 5]);
+
+         var piechartDeathCase = new google.visualization.PieChart(document.getElementById('piechart3_div'));
+         piechartDeathCase.draw(dengueDeathView, {width: 400, height: 400, title: 'Dengue Death Cases in KL (2014)'});
+       };
+
+       var genColchart = function genColchart(data) {
+         var dengueView = new google.visualization.DataView(data);
+         dengueView.setColumns([0, 3]);
+
+         var colDengueChart = new google.visualization.ColumnChart(document.getElementById('colchart1_div'));
+         colDengueChart.draw(dengueView, {
+           title: 'Dengue Cases in KL (2014)',
+           series: {
+             0:{color: 'blue', visibleInLegend: false}
+           }
+         });
+
+         var dengueHemorrhageView = new google.visualization.DataView(data);
+         dengueHemorrhageView.setColumns([0, 4]);
+
+         var colDengueHemorrhageChart = new google.visualization.ColumnChart(document.getElementById('colchart2_div'));
+         colDengueHemorrhageChart.draw(dengueHemorrhageView,  {
+           title: 'Dengue Hemorrhagic Cases in KL (2014)',
+           series: {
+             0:{color: 'purple', visibleInLegend: false}
+           }
+        });
+
+         var dengueDeathView = new google.visualization.DataView(data);
+         dengueDeathView.setColumns([0, 5]);
+
+         var colDengueDeathChart = new google.visualization.ColumnChart(document.getElementById('colchart3_div'));
+         colDengueDeathChart.draw(dengueDeathView, {title: 'Dengue Death Cases in KL (2014)',
+          series: {
+            0:{color: 'red', visibleInLegend: false}
+          }
+        });
+
+         google.visualization.events.addListener(colDengueChart, 'select', function(){
+           colDengueDeathChart.setSelection(colDengueChart.getSelection());
+         });
+       };
+
+       genCharts();
+
+     }
+    </script>
+  </head>
+
+  <body>
+    <div id="table_div" style="width:800px;margin-left:auto;margin-right:auto;"></div>
+    <div id="colchart1_div"></div>
+    <div id="colchart2_div"></div>
+    <div id="colchart3_div"></div>
+    <div style="width:1200px;margin-left:auto;margin-right:auto;">
+      <div id="piechart1_div" style="width:400px;float:left;"></div>
+      <div id="piechart2_div" style="width:400px;display:inline-block;"></div>
+      <div id="piechart3_div" style="width:400px;float:right;"></div>
+    </div>
+
+    <div style="width:1000px;margin-left:auto;margin-right:auto;">
+      <div id="map_div" style="width:500px;display:inline-block;"></div>
+      <div id="geomap_div" style="width:500px;float:right"></div>
+    </div>
+  </body>
+</html>

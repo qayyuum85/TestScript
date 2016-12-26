@@ -1,14 +1,14 @@
-import codecs, sys, json, time
+#!/usr/bin/python
+import codecs, sys, json, time, os
+import tweepy
 from tweepy import Stream
 from tweepy.streaming import StreamListener
-from twTOM import getprops
 import twTOM
 import intersys.pythonbind3
 
 # Get configuration Id from command line
-configId = sys.argv[1]
-ns = sys.argv[2]
-
+# Please hardcode this value in case you are running from the notebook
+configId = 2
 secrets = getprops("WIBIS.properties")
 user = secrets['USERNAME'];
 password = secrets['PASSWORD'];
@@ -19,16 +19,16 @@ try:
     class listener(StreamListener):
         def on_data(self, data):
             d = json.loads(data)
-
+            print(d['text'])
             twMsg = database.create_new("%BI.TweetMessage", None)
-            twMsg.set("CreateDate", d['created_at'])
-            twMsg.set("TweetText", d['text'])
+            twMsg.set("DateCreated", d['created_at'])
+            twMsg.set("TweetMessage", d['text'])
             twMsg.set("Username", d['user']['screen_name'])
             twMsg.set("TweetID", d['id_str'])
 
             urls = d['entities']['urls']
             for url in urls:
-                twMsg.run_obj_method("AddLink", url['expanded_url'])
+                twMsg.run_obj_method("AddLink", [url['expanded_url']])
 
             twMsg.run_obj_method("%Save",[])
             return True
@@ -43,15 +43,19 @@ try:
     database = intersys.pythonbind3.database(conn)
 
     # Get filter based on WebExtractor setting
-    trackFilter = database.run_class_method("%BI.WebExtractor", "getFilter", [configId])
+    trackFilter = database.run_class_method("%BI.WebExtractor", "GetFilter", [configId])
     # Get authentication from file
     auth = twTOM.Authenticate()
     twitterStream = Stream(auth, listener())
-    twitterStream.filter(track=trackFilter, language="en")
+    twitterStream.filter(track=trackFilter, languages=['en'])
+    processId = os.getpid()
+
+except tweepy.TweepError as e:
+    print(e)
 
 except intersys.pythonbind3.cache_exception as err:
     print ("InterSystems Cache' exception")
     print (sys.exc_type)
     print (sys.exc_value)
     print (sys.exc_traceback)
-    print (str(err))
+    print ('Error code:' + str(err))

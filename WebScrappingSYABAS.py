@@ -1,8 +1,10 @@
 import urllib.request as rq
 import re
 from bs4 import BeautifulSoup
+import json
+from  WebScrappingUtilWIBIS import save_to_DB
 
-def process_content(soupObject):
+def process_content(soupObject, link):
     # article title
     def get_title():
         pagetitle = soupObject.find(class_='pagesubtitle')
@@ -12,13 +14,20 @@ def process_content(soupObject):
     def get_content():
         import re
         pagecontent = soupObject.find(class_='pagecontent')
+
+        # Content
         formattedContent = pagecontent.prettify(formatter="html")
-        return re.sub(pattern=r'\n', repl='', string=formattedContent)
+        content = re.sub(pattern=r'\n', repl='', string=formattedContent)
+        return content
 
-    title = get_title()
-    content = get_content()
+    item = dict()
+    item['date'] = ''
+    item['title'] = get_title()
+    item['text'] = get_content()
+    item['file_link'] = ''
+    item['page_link'] = link
 
-    return {'title': title, 'content': content}
+    return item
 
 # Get Pages and open others
 def get_pagelist(startLink):
@@ -54,7 +63,6 @@ def get_pagelist(startLink):
         maxObj = get_max_page(scrappedPage)
         currPage = lastPage
         lastPage = maxObj['lastpage']
-        print(lastPage)
 
         if not eval_finished():
             linkList.extend(maxObj['links'])
@@ -94,7 +102,18 @@ urlSYABAS = 'http://www.syabas.com.my/nodes/index/page:1/type:press-release'
 all_links = uniqify(get_pagelist(urlSYABAS))
 
 # Now parse the website based on the list
-all_content = []
+contents = []
 for link in all_links:
-    extract = scrap_web(link)
-    all_content.append(process_content(extract))
+    web_extract = scrap_web(link)
+    contents.append(process_content(web_extract, link))
+
+# wrap to JSON
+for content in contents:
+    main = dict()
+    main['category'] = 'SYABAS'
+    main['cat_desc'] = 'Syarikat Bekalan Air Selangor'
+    main['content'] = content
+    jsonstr = json.dumps(main)
+
+    # send content to Cache
+    save_to_DB(jsonstr)

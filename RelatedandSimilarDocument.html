@@ -1,0 +1,402 @@
+<script language="cache" runat="server">
+	s attachId = %request.Get("attachId")
+	s postId = %request.Get("postId")
+</script>
+
+<!DOCTYPE HTML>
+<html>
+<head>
+<script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+<script type="text/javascript" src="js/tab.js"></script>
+<link rel="stylesheet" href="webStyle.css" type="text/css">
+<link rel="stylesheet" href="css/style.css" type="text/css">
+
+<style type="text/css">
+	table {
+		color: #555555;
+		font-family: Arial;
+		font-size: 12px;
+	}
+	table#simTab> tbody > tr > td, table#relTab > tbody > tr > td {
+		text-align:center;
+		border:solid 1px #BDBDBD;
+		border-top:none;
+		padding-left:3px;
+		height: 2.5em;
+	}
+	table#simTab ,table#relTab {
+		width:100%;
+		border-collapse:collapse;
+		border:solid 1px #BDBDBD;
+		margin-bottom: 2em;
+	}
+	table#simTab thead td,table#relTab thead td {
+		font-weight: bold;
+		font-size: 14px;
+		background-image: none;
+		background-color: rgb(230, 238, 243);
+		height: 2em;
+		border: 1px solid #cccccc;
+	}
+	.evenRow {
+		background-color:#ffffff;
+	}
+	.oddRow {
+		background-color:#f2f2f2;
+	}
+	.clickable {
+		cursor:pointer;
+		display:inline-block;
+		width: 20px;
+		/*margin-top:6px;*/
+	}.summary {
+		border-top: 1px solid #bdbdbd;
+		margin-right:10px;
+		margin-bottom:10px;
+		padding-right:10px;
+		padding-left: 3px;
+		padding-top: 10px;
+	}
+	.togResult 	 {
+		float:right;
+		margin-right:10px;
+	}
+	.titleBar {
+		font-weight: bold;
+		font-size: 16px;
+		border-top-color: #cccccc;
+		border-right-color: #cccccc;
+		border-bottom-color: #cccccc;
+		border-left-color: #cccccc;
+		border-top-width: 0px;
+		border-right-width: 0px;
+		border-bottom-width: 1px;
+		border-left-width: 0px;
+		border-top-style: solid;
+		border-right-style: solid;
+		border-bottom-style: solid;
+		border-left-style: solid;
+		background-image: none;
+		background-color: rgb(211, 221, 230);
+	}
+	.tab {
+		color: #555555;
+		font-family: Arial;
+		font-size: 12px;
+		font-weight: bold;
+		border-top-color: #cccccc;
+		border-right-color: #cccccc;
+		border-bottom-color: #cccccc;
+		border-left-color: #cccccc;
+		border-top-width: 1px;
+		border-right-width: 1px;
+		border-bottom-width: 1px;
+		border-left-width: 1px;
+		border-top-style: solid;
+		border-right-style: solid;
+		border-bottom-style: solid;
+		border-left-style: solid;
+		background-image: none;
+		background-color: rgb(211, 221, 221);
+	}
+	.tabSel {
+		color: #555555;
+		font-family: Arial;
+		font-size: 12px;
+		border-bottom-color: transparent;
+		background-image: none;
+		background-color: rgb(255, 255, 255);
+	}
+	table.subTab {
+		width: 96%;
+	}
+	.percent {
+		display: block;
+		margin-top: 8px;
+	}
+</style>
+<title>	Similar & Related Documents </title>
+<script type="text/javascript">
+	var attachId = "#(attachId)#";
+	var postId = "#(postId)#";
+
+	function drawTable(tableId) {
+		var table = document.getElementById(tableId);
+		if (tableId=="simTab") {
+			var resObj = $.parseJSON(#server(%BI.WebKnowledge.GetSimilar("KM", attachId, postId))#);
+		}
+		else {
+			var resObj = $.parseJSON(#server(%BI.WebKnowledge.GetRelated("KM", attachId, postId))#);
+		}
+
+		var objLen = resObj.length;
+
+		for (var i = 0; i<objLen; i++) {
+			var tdCnt = 0;
+			var row = table.insertRow(i+1);
+			row.className = ((i+1)%2) ? "oddRow" : "evenRow";
+
+			/*
+			var td0 = row.insertCell(tdCnt);
+			tdCnt++;
+			td0.innerHTML = i+1;
+			*/
+
+			if (typeof resObj[i].PctMatch !== "undefined") {
+				var td1 = row.insertCell(tdCnt);
+				var pctM = document.createElement("span");
+				pctM.className = "percent";
+				pctM.innerHTML = resObj[i].PctMatch;
+				td1.appendChild(pctM);
+				td1.style.verticalAlign = "top";
+				tdCnt++;
+			}
+
+			if (typeof resObj[i].PctNew !== "undefined") {
+				var td2 = row.insertCell(tdCnt);
+				var pctN = document.createElement("span");
+				pctN.className = "percent";
+				pctN.innerHTML = resObj[i].PctNew;
+				td2.appendChild(pctN);
+				td2.style.verticalAlign = "top";
+				tdCnt++;
+			}
+
+			var td3 = row.insertCell(tdCnt);
+			tdCnt++;
+
+			var div1 = document.createElement("div");
+			var fileLink, name, postLink;
+			if (resObj[i].Attachment) {
+				fileLink = resObj[i].Attachment.Link;
+				name = resObj[i].Attachment.Name;
+				postLink = resObj[i].Attachment.ThreadLink;
+			}
+
+			if (resObj[i].Post) {
+				postLink = resObj[i].Post.ThreadLink;
+				name = resObj[i].Post.PostTitle;
+			}
+
+			var subTab = document.createElement("table");
+			subTab.className = "subTab";
+			var subRow = subTab.insertRow(0);
+			var subTD1 = subRow.insertCell(0);
+
+			var tSpan = document.createElement("span");
+			tSpan.innerHTML = name;
+			subTD1.appendChild(tSpan);
+
+			// src=img/details.gif
+			// src=img/doc.gif
+			// src=img/socialNetwork/attach40.png
+			// src=img/socialNetwork/icon_discussion.png
+
+			var img1 = document.createElement("img");
+			img1.src = "img/details.gif";
+			img1.width = "20";
+			img1.height = "20";
+
+			var img2 = document.createElement("img");
+			img2.src = "img/socialNetwork/attach40.png";
+			img2.width = "20";
+			img2.height = "20";
+
+			var img3 = document.createElement("img");
+			img3.src = "img/socialNetwork/icon_discussion.png";
+			img3.width = "20";
+			img3.height = "20";
+
+			var spanSummary = document.createElement("p");
+			spanSummary.innerHTML = resObj[i].Summary;
+			spanSummary.className = "summary";
+			spanSummary.style.display = "none";
+
+			//Toggle Summary
+			var spanTog = document.createElement("span");
+			spanTog.className = "clickable";
+			spanTog.title = "View Summary";
+			spanTog.onclick = function (summ) {
+				return function (){
+					var state = summ.style.display;
+					summ.style.display = (state == "none") ? "block" : "none";
+				};
+			}(spanSummary);
+
+			//View File
+			var spanFile = document.createElement("span");
+			spanFile.title = "View File";
+			spanFile.className = "clickable";
+			spanFile.onclick = function (fLink) {
+				return function (){
+					window.open(fLink,"","target=blank");
+				};
+			}(fileLink);
+
+			//View Post
+			var spanPost = document.createElement("span");
+			spanPost.title = "View Post";
+			spanPost.className = "clickable";
+			spanPost.onclick = function (pLink) {
+				return function (){
+					window.open(pLink,"","target=blank");
+				};
+			}(postLink);
+
+			spanTog.appendChild(img1);
+			spanFile.appendChild(img2);
+			spanPost.appendChild(img3);
+
+			var subTD2 = subRow.insertCell(1);
+			subTD2.style.textAlign = "right";
+			subTD2.appendChild(spanTog);
+			subTD2.appendChild(spanPost);
+			if (resObj[i].Attachment) {
+				subTD2.appendChild(spanFile);
+			}
+
+			div1.appendChild(subTab);
+
+			var div2 = document.createElement("div");
+			div2.appendChild(spanSummary);
+			td3.appendChild(div1);
+			td3.appendChild(div2);
+			td3.style.textAlign="left";
+		}
+	}
+
+	function drawResult() {
+		//drawSelection("simChk");
+		//drawSelection("relChk");
+		drawTable("simTab");
+		drawTable("relTab");
+		sTab('d1','d2');
+	}
+
+	function drawSelection(id) {
+
+		var div = document.createElement("div");
+		div.innerHTML = "Show: "
+		div.className = "togResult";
+
+		var label = [
+			{
+				text: "Posts",
+				value: "post"
+			},
+			{
+				text: "Attachments",
+				value: "attach"
+			}
+		];
+
+		for (var i=0; i<2; i++) {
+			var span = document.createElement("span");
+			var chkLabel = document.createElement("label");
+			var chkBox = document.createElement("input");
+			chkBox.value = label[i].value;
+			chkBox.type = "checkbox";
+			chkBox.onclick = function (elem) {
+				return function () {
+					alert(elem.checked);
+				};
+			}(chkBox);
+
+			chkLabel.style.float = "left";
+			chkLabel.innerHTML = label[i].text;
+			chkLabel.appendChild(chkBox);
+			span.appendChild(chkLabel);
+			div.appendChild(span);
+		}
+		var td = document.getElementById(id);
+		td.appendChild(div);
+	}
+
+
+</script>
+</head>
+
+<body onload="drawResult()" >
+	<div style='width:100%; height:100%;'>
+		<table style='width:100%;' cellspacing=0 cellpadding=0>
+			<tr>
+				<td align=center style="height:25;">
+					<div class="titleBar" style="height:25;">Related Articles(s)</div>
+				</td>
+			</tr>
+			<!--tr style='background-color:#f2f2f2;'>
+				<td align=center style='display:inline;font-size:1em;position:fixed;border-right:1px solid black;'><span style='font-weight:bold'>Similar Documents</span></td>
+				<td align=center style='display:inline;font-size:1em;position:fixed;border-left:1px solid black;'><span style='font-weight:bold'>Related Documents</span></td>
+			</tr-->
+			<tr>
+				<td style="padding-top:3px;">
+					<table cellpadding=0 cellspacing=0>
+						<tr>
+							<td><div id=td1 class=tab onclick=sTab('d1','d2') onmouseover=mover(this) onmouseout=mout(this)>Similar</div></td>
+							<td><div id=td2 class=tab onclick=sTab('d2','d1') onmouseover=mover(this) onmouseout=mout(this)>Related</div></td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<div class=tabFrm style='height:600px'>
+						<div style='width:100%;'>
+							<div id=d1 class=tabDiv style="overflow:auto;">
+								<table id='simTab'>
+									<thead>
+										<tr>
+											<!--th align=center style="width:30px">Ranking</th-->
+											<td align=center style="width:70px" title="Percentage of entities in Original Source that similar to Compared Source">% Similar</td>
+											<td align=center style="width:70px" title="Percentage of entities that is new in Compared Source but not in Original Source.">% New</td>
+											<td align=center>Articles</td>
+										</tr>
+									</thead>
+								</table>
+							</div>
+							<div id=d2 class=tabDiv style="overflow:auto;">
+								<table id='relTab'>
+									<thead>
+										<tr>
+											<!--th align=center style="width:30px">No.</th-->
+											<td align=center>Articles</td>
+										</tr>
+									</thead>
+								</table>
+							</div>
+						</div>
+					</div>
+				</td>
+			</tr>
+			<!--tr style='background-color:#f2f2f2;'>
+				<td id=simChk style='width:50%;border-right:1px solid black;'></td>
+				<td id=relChk style='width:50%;border-left:1px solid black;'></td>
+			</tr>
+			<!--tr>
+				<td valign=top style='width:50%;border-right:1px solid black;'>
+					<div style='width:100%; height:600px; overflow:auto;'>
+						<table id='simTab'>
+							<tr class="titleBar">
+							<th align=center style="width:30px">Ranking</th>
+							<th align=center style="width:50px">Percentage Matched</th>
+							<th align=center style="width:50px">Percentage New</th>
+							<th align=center>Description</th>
+							</tr>
+						</table>
+					</div>
+				</td>
+				<td valign=top style='width:50%; border-left:1px solid black;'>
+					<div style='width:100%; height:600px; overflow:auto; '>
+						<table id='relTab'>
+							<tr class="titleBar">
+							<th align=center style="width:30px">No.</th>
+							<th align=center>Description</th>
+							</tr>
+						</table>
+					</div>
+				</td>
+			</tr-->
+		</table>
+	</div>
+</body>
+</html>

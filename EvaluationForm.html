@@ -1,0 +1,1837 @@
+<script language="cache" runat="server">
+s usrId = %session.Get("CurrUserID")
+s level = %request.Get("level")
+s bapId = %request.Get("bapId")
+s ApplicationId = %request.Get("appId")
+s view = %request.Get("view")
+s frmPg = %request.Get("frmPg")
+s type = %request.Get("type")
+s onBehalfPanel = %request.Get("onBehalfPanel")
+
+i view'=""{
+	s ApplicationId=##class(MyGrant.Evaluation).%OpenId(view).ApplicationId.%Id()
+}
+
+s sql=##class(%ResultSet).%New("%DynamicQuery:SQL")
+//Query updated for GSP, added RMCId in SQL - 2/10/2014
+i sql.Prepare("Select U.FullName,U.ID From MyGrant.AppResearcher A,%BI.Users U WHERE (A.ResearcherId=U.ID OR A.RMCId=U.ID) AND ApplicationId="_ApplicationId_" AND ProjectLeader=1 "){
+	i sql.Execute(){
+		i sql.Next(){
+			s pLeader=sql.Get("FullName")
+			s pLeaderId=sql.Get("ID")
+		}
+	}
+}
+
+s application = ##class(MyGrant.Application).%OpenId(ApplicationId)
+s special=application.Status
+s GrantId = application.BatchId.GrantId.GrantId
+s KPMResub = application.BatchId.KPMResub
+s formatFlag=0
+i (application.BatchId.EvalFormat=2){
+	s formatFlag=1
+}
+;s formatFlag=1
+// Allow eval for program only
+s allowProgEval = $$allProjectEvaluated^myGrant.Eval(ApplicationId)
+
+s batchId = application.BatchId.%Id()
+s Title = application.Title
+s transType = application.Type
+
+s isSubProj = 0
+s programId = ""
+s progTitle = ""
+i (application.ProgramId'="")
+{
+	s isSubProj = 1
+	s programId = application.ProgramId.%Id()
+	s progTitle = ##class(MyGrant.Application).%OpenId(programId).Title
+}
+
+s EvaluationId=""
+i view=""	//Edit Mode
+{
+	s qry="SELECT ID FROM MyGrant.Evaluation WHERE ApplicationId="_ApplicationId_" AND Levels="_level
+	s inputUserObj=""
+	i onBehalfPanel="" {
+		s qry=qry_" AND Evaluator="_usrId
+		s evaluatorObj=##class(MyGrant.Users).%OpenId(usrId)
+	}
+	else {
+		s qry=qry_" AND Evaluator="_onBehalfPanel
+		s evaluatorObj=##class(MyGrant.Users).%OpenId(onBehalfPanel)
+		s inputUserObj=##class(MyGrant.Users).%OpenId(usrId)
+	}
+	s rs=##class(%ResultSet).%New("%DynamicQuery:SQL")
+	i rs.Prepare(qry) {
+		i rs.Execute() {
+			i rs.Next() {
+				s EvaluationId = rs.Data("ID")
+				;i onBehalfPanel'=""{
+					s evalObj=##class(MyGrant.Evaluation).%OpenId(EvaluationId)
+					s evalObj.InputUser = inputUserObj
+					d evalObj.%Save()
+				;}
+			}
+		}
+	}
+	i EvaluationId=""
+	{
+		s evalObj = ##class(MyGrant.Evaluation).%New()
+		s evalObj.ApplicationId	= ##class(MyGrant.Application).%OpenId(ApplicationId)
+		s evalObj.Levels = level
+		i (level=1),(type=1) {s evalObj.SubLevel = 1}
+		elseif (level=1),(type=2) {
+			s evalObj.SubLevel = 2
+			s evalObj.FirstApplicationId = ##class(MyGrant.Application).%OpenId(ApplicationId)
+		}
+		s evalObj.Evaluator = evaluatorObj
+		s evalObj.InputUser = inputUserObj
+		s evalObj.StartDate = $p($h, ",")
+		s evalObj.StartTime = $p($h, ",", 2)
+		d evalObj.%Save()
+		s EvaluationId = evalObj.%Id()
+	}
+}
+else	//View Mode
+{
+	s EvaluationId=view
+}
+
+i ##class(MyGrant.Evaluation).%OpenId(EvaluationId){
+	s evaluator=##class(MyGrant.Evaluation).%OpenId(EvaluationId).Evaluator
+	i evaluator s evaluatorName=##class(%BI.Users).%OpenId(evaluator.%Id()).FullName
+}
+
+s noHighRec=""
+s sql=##class(%ResultSet).%New("%DynamicQuery:SQL")
+i sql.Prepare("Select NoHighlyRecomm From MyGrant.GrantBatch Where ID="_batchId_" "){
+	i sql.Execute(){
+		i sql.Next(){
+			s noHighRec=sql.Get("NoHighlyRecomm")
+		}
+	}
+}
+
+s bypassedEval=0
+s evalObj=##class(MyGrant.Evaluation).%OpenId(EvaluationId)
+i (evalObj.FirstApplicationId'=""),(evalObj.FirstApplicationId.%Id()'=evalObj.ApplicationId.%Id()) s bypassedEval=1
+
+s hidePanel=$$HidePanel^myGrant.Util(ApplicationId)
+i (hidePanel=1) s evaluatorName=""
+
+s simVal = 0
+i (level = 3) {
+	// do similarity checking here
+	s simVal = $$getSingleSimilarity^myGrant.SimilarityReport(ApplicationId)
+}
+
+
+</script>
+
+<!DOCTYPE HTML>
+<html height=100%>
+<head>
+<style type="text/css">
+@media print
+{
+	.pNShow {
+		display: none;
+	}
+}
+
+input[type=button] {
+	padding-left:5px;
+	padding-right:5px;
+	width:100%;
+}
+
+input[type=button].titleBtn{
+	width:20%;
+	float:right;
+	vertical-align:top;
+}
+.totalCount{
+	font-weight:bold;
+	text-align:right;
+}
+.pct{
+	font-weight:bold;
+}
+span#simAlert {
+	color: red;
+	font-weight: bold;
+	display: none;
+}
+
+</style>
+<!-- Put your page Title here -->
+<title>	Evaluation Form </title>
+<link rel=stylesheet type=text/css href=work/mygrant/custom/css/main.css>
+<script language=javascript>
+var EvalMode=1; //0-View mode, 1-Normal(panel), 2-Content(RMC Admin)
+var CriteriaNum=0;	//Number of criteria
+var CriteriaIdArr = new Array();	//save the criteria ID radio array
+var CriteriaIdComArr = new Array();	//save the criteria ID comment form
+var FieldIdArr = new Array();	//save the field ID
+var votArr = new Array();	// not using for lvl1
+var bapId = "#(bapId)#";
+var ApplicationId = "#(ApplicationId)#";
+var level = "#(level)#";
+var EvaluationId = "#(EvaluationId)#";
+var transType = "#(transType)#";
+var view = "#(view)#";
+var special = "#(special)#";
+var pLeader = "#(pLeader)#";
+var frmPg = "#(frmPg)#";
+var contentType = "#(type)#";
+var batchId = "#(batchId)#";
+var formatFlag = parseInt("#(formatFlag)#");
+var saveInterval=120;
+var saveTimer=saveInterval;
+var interval;
+var autoSaveState="";
+var onBehalfPanel = "#(onBehalfPanel)#";
+var bypassedEval = "#(bypassedEval)#";
+var GrantId= "#(GrantId)#";
+var simVal = "#(simVal)#";
+var allowProgEval = "#(allowProgEval)#";
+
+var fieldArr=['','RmTitle','RmLeaderDetails','RmCluster','RmRsLocation','RmDuration','RmMember','RmLeaderProject','RmLeaderPublication','RmRsBackground','RmRsRef','RmObjective','RmMethodology','RmExpFinding','RmBudget'];
+
+function calcVotTotal()
+{
+	var table=document.getElementById('votTable');
+	var row=table.getElementsByTagName("tr");
+	var propTotal=0;
+	var recTotal=0;
+	for (var i=1;i<(row.length-1);i++)
+	{
+		var tdObj=row[i].getElementsByTagName("td");
+		propTotal=propTotal+parseInt(tdObj[1].childNodes[0].innerHTML);
+		if (tdObj[2].childNodes[0].value!="") {recTotal=recTotal+parseInt(tdObj[2].childNodes[0].value);}
+		else {recTotal=recTotal+parseInt(tdObj[1].childNodes[0].innerHTML)}
+	}
+
+	calcVotPct(recTotal);
+	document.getElementById('proposedT').innerHTML=propTotal;
+	document.getElementById('recoT').innerHTML=recTotal;
+}
+
+var votError;
+function calcVotPct(recTotal)
+{
+	var table=document.getElementById('votTable');
+	var row=table.getElementsByTagName("tr");
+	var propVal=0;
+	votError=[];
+	for (var i=1;i<(row.length-1);i++)
+	{
+		var max = 0, type;
+		var tdObj=row[i].getElementsByTagName("td");
+		var innerTd = tdObj[0].getElementsByTagName("span");
+		if (innerTd.length === 1)
+		{
+			var maxObj = innerTd[0].getAttribute("data_ceil") || innerTd[0].data_ceil;
+			maxObj = maxObj.split("||");
+			max = parseInt(maxObj[1]);
+			type = maxObj[2];
+		}
+		if (tdObj[2].childNodes[0].value!="") {propVal=parseInt(tdObj[2].childNodes[0].value);}
+		else {propVal=parseInt(tdObj[1].childNodes[0].innerHTML);}
+
+		//Calculate each vote
+		tdObj[3].innerHTML="";
+		var span = document.createElement("span");
+		span.className = 'pct';
+		var evalPct = ((propVal/recTotal)*100).toFixed(2);
+		if (max && type==="P" && evalPct>max){
+			span.style.color = "red";
+			if (isNaN(evalPct)) { evalPct = 0;}
+			span.innerHTML=evalPct.toString()+" %";
+			votError.push(tdObj[2].childNodes[0].id);
+		}
+		else if (max && type==="V" && propVal>max) {
+			span.style.color = "red";
+			if (isNaN(evalPct)) { evalPct = 0;}
+			span.innerHTML= "RM"+ propVal + " " + evalPct.toString()+" %";
+			votError.push(tdObj[2].childNodes[0].id);
+		}
+		else{
+			span.style.color = "blue";
+			if (isNaN(evalPct)) { evalPct = 0;}
+			span.innerHTML=evalPct.toString()+" %";
+		}
+		tdObj[3].appendChild(span);
+	}
+
+	//alert(votError.length);
+}
+
+function validateVot()
+{
+	if (GrantId=="PRGS"){
+		return true;
+	}
+	var table=document.getElementById('votTable');
+	var row=table.getElementsByTagName("tr");
+	var flag = false;
+	for (var i=1;i<(row.length-1);i++)
+	{
+		var tdObj=row[i].getElementsByTagName("td");
+		if (tdObj[2].childNodes[0].value!=""){
+			flag=true;
+		}
+	}
+
+	if (flag==false) {
+		alert('Please fill in proposed budget first before submitting this evaluation.');
+		return false;
+	}
+
+	if (votError.length==0){
+		return true;
+	}
+	else{
+		for (var i=0;i<votError.length;i++)
+		{
+			var obj = document.getElementById(votError[i]);
+			obj.style.borderColor = "red";
+		}
+		alert('Proposed budget does not adhere to guideline. Please adjust accordingly.');
+		return false;
+	}
+}
+
+function init()
+{
+	if (bapId=="")
+		btnSave.style.display="none";
+
+	if (contentType==2)
+	{
+		ContentMode();
+		#server(MyGrant.WebEvaluation.LoadEvaluation(EvaluationId))#;
+		ShowNote();
+		return;
+	}
+
+	//To load Evaluation data
+	var fieldId="";
+	var Y="";
+	for(i=1;i<=FieldIdArr.length;i++)
+	{
+		fieldId = fieldId +Y +FieldIdArr[i-1]
+		Y = ",";
+	}
+	var critId="";
+	var Y="";
+	for(i=1;i<=CriteriaIdComArr.length;i++)
+	{
+		critId = critId +Y +CriteriaIdComArr[i-1]
+		Y = ",";
+	}
+	#server(MyGrant.WebEvaluation.LoadRmCrit(EvaluationId,fieldId,critId))#;
+	#server(MyGrant.WebEvaluation.LoadEvaluation(EvaluationId))#;
+
+	CountCriteriaScore();
+	ShowNote();
+
+	if (view){
+		ViewMode();
+	}
+
+	if (special==2&&!view){
+		var dropdown=document.getElementById("recommend");
+		dropdown.innerHTML="";
+		dropdown.options[0] = new Option('Recommended',1);
+		dropdown.options[1] = new Option('Highly Recommended',2);
+		dropdown.options[2] = new Option('Not Recommended',0);
+		document.getElementById("noteDiv").innerHTML="";
+		//document.getElementById("recommend").innerHTML="<option value='1'>Recommended</option><option value='2'>Highly Recommended</option><option value='0'>Not Recommended (Please specify reason)</option>";
+	}
+	calcVotTotal();
+}
+
+function timer()
+{
+	if (bapId=="") return;
+	document.getElementById('autoSaveReminder').style.display="block";
+	interval=setInterval("CountDown();",1000);
+}
+
+function CountDown()
+{
+	saveTimer--;
+	if (saveTimer==0)
+		AutoSave();
+	else{
+		 document.getElementById('autoSaveReminder').innerHTML='Auto-save in '+(saveTimer)+' second(s)';
+	}
+}
+
+function AutoSave()
+{
+	clearInterval(interval);
+	switch (EvalMode)
+	{
+		case 1:
+		SaveAuto();
+		break;
+
+		case 2:
+		ContentSaveAuto();
+		break;
+
+		default:
+		break;
+	}
+	if (autoSaveState==1){
+		document.getElementById('autoSaveReminder').innerHTML='Saved Successfully';
+	}
+	saveTimer=saveInterval;
+	timer();
+}
+
+function ViewMode()
+{
+	EvalMode=0;
+	//btnBack.style.display="none";
+	btnSave.style.display="none";
+	btnSubmit.style.display="none";
+	btnViewProp.style.display="none";
+	btnViewModeProp.style.display="block";
+	document.getElementById("noteDiv").innerHTML="";
+
+	//disable comment box
+	for(i=1;i<=FieldIdArr.length;i++)
+	{
+		var objId = FieldIdArr[i-1]
+		var obj=document.getElementById("RmCrit" +objId);
+		//obj.disabled=true;
+		var td = obj.parentNode.parentNode.getElementsByTagName('td')[0];
+		if (td) {
+			td.style.cursor="default";
+			td.title="";
+			td.onmouseover="";
+			td.onclick="";
+		}
+
+		rem=obj.value;
+		rem=rem.split("\n").join("<br/>");
+		obj.parentNode.innerHTML="<div style='width:99%;height:"+obj.parentNode.offsetHeight+"px;overflow:auto'>"+rem+"</div>";
+
+	}
+	for(i=1;i<=CriteriaIdComArr.length;i++)
+	{
+		var objId = CriteriaIdComArr[i-1]
+		var obj=document.getElementById("ComCrit" +objId);
+		//obj.disabled=true;
+		var td = obj.parentNode.parentNode.getElementsByTagName('td')[0];
+		if (td) {
+			td.style.cursor="normal";
+			td.title="";
+			td.onmouseover="";
+			td.onclick="";
+		}
+
+		rem=obj.value;
+		rem=rem.split("\n").join("<br/>");
+		obj.parentNode.innerHTML="<div style='width:99%;height:"+obj.parentNode.offsetHeight+"px;overflow:auto'>"+rem+"</div>";
+	}
+	var img='';
+	//disable radio btn
+	for(i=1;i<=CriteriaIdArr.length;i++)
+	{
+		img=document.createElement("img");
+		img.src="work/mygrant/custom/img/tick.gif";
+
+		var objId = CriteriaIdArr[i-1]
+		var obj=document.getElementById("cID"+objId+"-1");
+		obj.disabled=true;
+		obj.parentNode.onmouseover="";
+		obj.parentNode.onclick="";
+		if(obj.checked){obj.parentNode.appendChild(img);}
+		obj.parentNode.removeChild(obj);
+
+		obj=document.getElementById("cID"+objId+"-2");
+		obj.disabled=true;
+		obj.parentNode.onmouseover="";
+		obj.parentNode.onclick="";
+		if(obj.checked){obj.parentNode.appendChild(img);}
+		obj.parentNode.removeChild(obj);
+
+		obj=document.getElementById("cID"+objId+"-3");
+		if (!obj) continue;
+		obj.disabled=true;
+		obj.parentNode.onmouseover="";
+		obj.parentNode.onclick="";
+		if(obj.checked){obj.parentNode.appendChild(img);}
+		obj.parentNode.removeChild(obj);
+
+		obj=document.getElementById("cID"+objId+"-4");
+		obj.disabled=true;
+		obj.parentNode.onmouseover="";
+		obj.parentNode.onclick="";
+		if(obj.checked){obj.parentNode.appendChild(img);}
+		obj.parentNode.removeChild(obj);
+
+		obj=document.getElementById("cID"+objId+"-5");
+		obj.disabled=true;
+		obj.parentNode.onmouseover="";
+		obj.parentNode.onclick="";
+		if(obj.checked){obj.parentNode.appendChild(img);}
+		obj.parentNode.removeChild(obj);
+	}
+
+	var pdfBtnDiv="";
+	pdfBtnDiv=document.createElement("div");
+	pdfBtnDiv.className="pNShow";
+	pdfBtnDiv.style.position="absolute";
+	pdfBtnDiv.style.top="0px";
+	pdfBtnDiv.style.right="0px";
+	pdfBtnDiv.style.padding="5px";
+	document.body.appendChild(pdfBtnDiv);
+
+	img=document.createElement("img");
+	img.onclick = (function() {
+		return function() {
+			window.print();
+		};
+	})();
+	img.src="work/mygrant/custom/img/printer.png";
+	img.alt="Print evaluation"
+	img.style.width="32px";
+	img.style.height="32px";
+	img.style.cursor="pointer";
+	img.title="Print evaluation";
+	pdfBtnDiv.appendChild(img);
+
+	//disable funding part
+	img=document.createElement("img");
+	img.src="work/mygrant/custom/img/tick.gif";
+	td=document.getElementById('tdce');
+	td.style.cursor="normal";
+	td.title="";
+	td.onmouseover="";
+	td.onclick="";
+	obj = document.getElementById("ce1");
+	obj.disabled=true;
+	obj.parentNode.onmouseover="";
+	obj.parentNode.onclick="";
+	if(obj.checked){obj.parentNode.appendChild(img);}
+	obj.parentNode.removeChild(obj);
+
+	obj = document.getElementById("ce2");
+	obj.disabled=true;
+	obj.parentNode.onmouseover="";
+	obj.parentNode.onclick="";
+	if(obj.checked){obj.parentNode.appendChild(img);}
+	obj.parentNode.removeChild(obj);
+
+	obj = document.getElementById("ce3");
+	obj.disabled=true;
+	obj.parentNode.onmouseover="";
+	obj.parentNode.onclick="";
+	if(obj.checked){obj.parentNode.appendChild(img);}
+	obj.parentNode.removeChild(obj);
+
+	obj = document.getElementById("ce4");
+	obj.disabled=true;
+	obj.parentNode.onmouseover="";
+	obj.parentNode.onclick="";
+	if(obj.checked){obj.parentNode.appendChild(img);}
+	obj.parentNode.removeChild(obj);
+
+	obj = document.getElementById("ce5");
+	obj.disabled=true;
+	obj.parentNode.onmouseover="";
+	obj.parentNode.onclick="";
+	if(obj.checked){obj.parentNode.appendChild(img);}
+	obj.parentNode.removeChild(obj);
+
+	for(i=1;i<=votArr.length;i++)
+	{
+		var objId = votArr[i-1]
+		var obj=document.getElementById("amt"+objId);
+		obj.disabled=true;
+	}
+
+	//disable recommended part
+	obj=document.getElementById("recommend");
+	var rec="";
+	if (recommend.selectedIndex!=-1)
+		rec = obj.options[recommend.selectedIndex].text;
+	obj.parentNode.innerHTML = "<label>"+rec+"</label>";
+
+	obj=document.getElementById("txtRemark");
+	rem=obj.value;
+	rem=rem.split("\n").join("<br/>");
+	obj.parentNode.innerHTML="<div style='width:99%;height:"+obj.parentNode.offsetHeight+"px;overflow:auto'>"+rem+"</div>";
+}
+
+var disableText=0;
+function refreshRm()
+{
+	if (view||formatFlag)
+		return;
+
+	if (childWin && childWin.closed && disableText==1)
+	{
+		//App form closed, okay to edit
+		var fieldId="";
+		var Y="";
+		for(i=1;i<=FieldIdArr.length;i++)
+		{
+			fieldId = fieldId +Y +FieldIdArr[i-1]
+			Y = ",";
+
+			var obj=document.getElementById("RmCrit" +FieldIdArr[i-1]);
+			obj.disabled=false;
+		}
+		#server(MyGrant.WebEvaluation.LoadRm(EvaluationId,fieldId))#;
+
+		var createClickHandler = function(objId)
+		{
+			return function() {
+				trigRadio(objId);
+			};
+		};
+		for(i=1;i<=CriteriaIdArr.length;i++)
+		{
+			var obj=document.getElementById("cID" +CriteriaIdArr[i-1] +"-1");
+			obj.disabled=false;
+			obj.parentNode.onclick=createClickHandler("cID" +CriteriaIdArr[i-1] +"-1");
+			obj=document.getElementById("cID" +CriteriaIdArr[i-1] +"-2");
+			obj.disabled=false;
+			obj.parentNode.onclick=createClickHandler("cID" +CriteriaIdArr[i-1] +"-2");
+		}
+		#server(MyGrant.WebEvaluation.LoadCrit(EvaluationId))#;
+
+		for(i=1;i<=votArr.length;i++)
+		{
+			var objId = votArr[i-1]
+			var obj=document.getElementById("amt"+objId);
+			obj.disabled=false;
+		}
+		#server(MyGrant.WebEvaluation.LoadEvalVote(EvaluationId))#;
+
+		disableText=0;
+
+		saveTimer=saveInterval;
+		timer();
+		CountCriteriaScore();
+	}
+
+	if (disableText==1){
+		//App form still open, not allowed to edit
+		var fieldId="";
+		var Y="";
+		for(i=1;i<=FieldIdArr.length;i++)
+		{
+			fieldId = fieldId +Y +FieldIdArr[i-1]
+			Y = ",";
+
+			var objId = FieldIdArr[i-1]
+			var obj=document.getElementById("RmCrit" +objId);
+			obj.disabled=true;
+		}
+		#server(MyGrant.WebEvaluation.LoadRm(EvaluationId,fieldId))#;
+
+		for(i=1;i<=CriteriaIdArr.length;i++)
+		{
+			var obj=document.getElementById("cID" +CriteriaIdArr[i-1] +"-1");
+			obj.disabled=true;
+			obj.parentNode.onclick="";
+			obj=document.getElementById("cID" +CriteriaIdArr[i-1] +"-2");
+			obj.disabled=true;
+			obj.parentNode.onclick="";
+		}
+		#server(MyGrant.WebEvaluation.LoadCrit(EvaluationId))#;
+
+		for(i=1;i<=votArr.length;i++)
+		{
+			var objId = votArr[i-1]
+			var obj=document.getElementById("amt"+objId);
+			obj.disabled=true;
+		}
+		#server(MyGrant.WebEvaluation.LoadEvalVote(EvaluationId))#;
+
+		CountCriteriaScore();
+	}
+}
+
+function loadFrame(url)
+{
+	parent.fraRight.location.href=url;
+}
+
+function LoadValue()
+{
+	if(EvaluationId=="") return;
+
+	btnSubmit.style.display = "none";
+	btnViewProp.style.display = "none";
+	//btnViewPrev.style.display = "none";
+	#server(MyGrant.WebEvaluation.LoadEvaluation(EvaluationId))#
+}
+
+function ValidateRecommended()
+{
+	score = 1;
+	for(i=1;i<=CriteriaIdArr.length;i++)
+	{
+		var critId = CriteriaIdArr[i-1];
+		if (critId.split(",").length>1) {continue;}
+		obj = document.getElementById('cID'+critId+'-2');
+		if (obj.checked) {score = 0; break;}
+	}
+	return score;
+}
+
+function ValidateCheckBox()
+{
+	var noCheck="";
+	var X="";
+	for(i=1;i<=CriteriaIdArr.length;i++)
+	{
+		var critId = CriteriaIdArr[i-1];
+		for(j=0;j<5;j++)
+		{
+			score = 0;
+			obj = document.getElementsByName('cID'+critId)[j];
+			if (!obj) continue
+			if (obj.checked) {score = 1; break;}
+		}
+
+		var objek=document.getElementById('cID'+critId+'-1');
+		var lala=objek.parentNode.parentNode;
+		lala.style.color="";
+
+		if (score==0){
+			noCheck+=X +critId;
+			X=String.fromCharCode(4);
+		}
+	}
+	return noCheck;
+}
+
+function ValidateRemark()
+{
+	var txtBox = new Array();
+	var cnt=0;
+	tbox = document.getElementsByTagName("textarea");
+	for(i=0;i<tbox.length;i++)
+	{
+		objId = tbox[i].id;
+		id = objId.split("Crit");
+		if (id.length<2) continue;
+		txtBox[cnt] = tbox[i];
+		txtBox[cnt].style.borderColor="";
+		cnt++;
+	}
+
+	cnt=txtBox.length-1;
+	var flag=0;
+	for(i=CriteriaNum;i>0;i--)
+	{
+		var critId = CriteriaIdArr[i-1];
+		if (critId.split(",").length>1) continue;
+		radioBtn = document.getElementById('cID'+critId+'-2');
+		if (!radioBtn||!txtBox[cnt]) continue;
+		if (radioBtn.checked&&txtBox[cnt].value==""){
+			txtBox[cnt].style.borderColor="red";
+			flag=critId;
+		}
+		cnt--;
+	}
+
+	return flag;
+
+}
+
+function CountCriteriaScore()
+{
+	var mainScore=new Array();
+	var subScore=new Array();
+	mainScore[0]=0;
+	mainScore[1]=0;
+	mainScore[2]=0;
+	mainScore[3]=0;
+	mainScore[4]=0;
+	subScore[0]=0;
+	subScore[1]=0;
+	subScore[2]=0;
+	subScore[3]=0;
+	subScore[4]=0;
+
+	for(i=1;i<=CriteriaIdArr.length;i++)
+	{
+		var critId = CriteriaIdArr[i-1];
+		for(j=0;j<5;j++)
+		{
+			score = 0;
+			obj = document.getElementsByName('cID'+critId)[j];
+			if (!obj) continue
+			if (obj.checked) {
+				if (critId.split(",").length>1){	//sub-criteria
+					subScore[j]++;
+				}
+				else{	//main-criteria
+					mainScore[j]++;
+				}
+			}
+		}
+	}
+
+	for (var i=0;i<5;i++)
+	{
+		var tdMain=document.getElementById('tdMainCriteriaScore'+i);
+		var tdSub=document.getElementById('tdSubCriteriaScore'+i);
+
+		if (tdMain&&tdSub){
+			tdMain.innerHTML=mainScore[i];
+			tdSub.innerHTML=subScore[i];
+		}
+	}
+}
+
+function SaveAuto()
+{
+	var criteriaScore = "";
+	var criteriaId = "";
+	var X = "";
+	var Y = "";
+	for(i=1;i<=CriteriaNum;i++)
+	{
+		critId = CriteriaIdArr[i-1];
+		for(j=0;j<5;j++)
+		{
+			score = "";
+			obj = document.getElementsByName('cID'+critId)[j];
+			if (!obj) continue;
+			if (obj.checked) {score = j+1; break;}
+		}
+		//scoreArr[i-1] = score;
+		criteriaScore = criteriaScore +X +score;
+		X = String.fromCharCode(2);
+
+		criteriaId = criteriaId +Y +CriteriaIdArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	//alert(criteriaId +"||" +criteriaScore);return;
+
+	var fieldId="";
+	var fieldCom="";
+	X = "";
+	Y = "";
+	for(i=1;i<=FieldIdArr.length;i++)
+	{
+		var obj = document.getElementById('RmCrit'+FieldIdArr[i-1]);
+		fieldCom = fieldCom +X +obj.value;
+		X = String.fromCharCode(2);
+
+		fieldId = fieldId +Y +FieldIdArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	var critComId="";
+	var critCom="";
+	X = "";
+	Y = "";
+	for(i=1;i<=CriteriaIdComArr.length;i++)
+	{
+		var obj = document.getElementById('ComCrit'+CriteriaIdComArr[i-1]);
+		critCom = critCom +X +obj.value;
+		X = String.fromCharCode(2);
+
+		critComId = critComId +Y +CriteriaIdComArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+
+	//Funding
+	var fundScore = ""
+	for(j=0;j<5;j++)
+	{
+		obj = document.getElementsByName('costEst')[j];
+		if (obj.checked) {fundScore = j+1; break;}
+	}
+	var votValue = "";
+	var votId = "";
+	X = "";
+	Y = "";
+	for(i=1;i<=votArr.length;i++)
+	{
+		tempId = votArr[i-1];
+		inp = document.getElementById("amt"+tempId);
+		votValue = votValue +X +inp.value;
+		X = String.fromCharCode(2);
+
+		votId = votId +Y +votArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	//alert(votValue +"||" +votId);return;
+
+	//Recommendation
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	var remark = txtRemark.value;
+
+	var ret = #server(MyGrant.WebEvaluation.SaveEvaluation(EvaluationId,ApplicationId,level,recomm,remark,criteriaScore,criteriaId,fundScore,votValue,votId,fieldCom,fieldId,critCom,critComId,1))#;
+	autoSaveState=ret;
+	if (ret>0)
+	{
+		//alert('autoSave successful');
+	}
+	else {
+		var failMsg = "Save failed.";
+		if (ret==-1){
+			failMsg+="\nPlease specify reason of your recommendation.";
+		}
+		else if (ret==-2){
+			failMsg+="\nThe application has proceeded to the next level. You are not allowed to edit this evaluation any more.";
+		}
+		alert(failMsg);
+	}
+}
+
+var finalDec=["Not Recommended","Recommended","Highly Recommended","Resubmission"];
+function Save(submit)
+{
+	var confirmMsg="";
+	if (level==1) confirmMsg="You have evaluated this application as "+finalDec[recommend.options[recommend.selectedIndex].value]+".\n\nIf you require the applicant to revise the application, please choose 'Resubmission'.\n\nDo you want to proceed?";
+	else if (level==3) confirmMsg="Are you sure to proceed?";
+	if (submit==1){
+		if (recommend.options[recommend.selectedIndex].value==""){
+			alert("Please choose a Recommendation to submit the evaluation.");
+			return;
+		}
+
+		if (!confirm(confirmMsg)){
+			return;
+		}
+	}
+
+	var valid = ValidateRemark();
+	if (valid!=0 && submit==1){
+		alert("Please give comment on why these criteria are inappropriate/incorrect.");
+		var focusObj = document.getElementById('cID'+valid+'-2');
+		if (focusObj) /*focusObj.scrollIntoView(true);*/focusObj.focus();
+		return;
+	}
+
+	var criteriaScore = "";
+	var criteriaId = "";
+	var X = "";
+	var Y = "";
+	for(i=1;i<=CriteriaNum;i++)
+	{
+		critId = CriteriaIdArr[i-1];
+		for(j=0;j<5;j++)
+		{
+			score = "";
+			obj = document.getElementsByName('cID'+critId)[j];
+			if (!obj) continue;
+			if (obj.checked) {score = j+1; break;}
+		}
+		//scoreArr[i-1] = score;
+		criteriaScore = criteriaScore +X +score;
+		X = String.fromCharCode(2);
+
+		criteriaId = criteriaId +Y +CriteriaIdArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	//alert(criteriaId +"||" +criteriaScore);return;
+
+	var fieldId="";
+	var fieldCom="";
+	X = "";
+	Y = "";
+	for(i=1;i<=FieldIdArr.length;i++)
+	{
+		var obj = document.getElementById('RmCrit'+FieldIdArr[i-1]);
+		fieldCom = fieldCom +X +obj.value;
+		X = String.fromCharCode(2);
+
+		fieldId = fieldId +Y +FieldIdArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	var critComId="";
+	var critCom="";
+	X = "";
+	Y = "";
+	for(i=1;i<=CriteriaIdComArr.length;i++)
+	{
+		var obj = document.getElementById('ComCrit'+CriteriaIdComArr[i-1]);
+		critCom = critCom +X +obj.value;
+		X = String.fromCharCode(2);
+
+		critComId = critComId +Y +CriteriaIdComArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+
+	//Funding
+	var fundScore = ""
+	for(j=0;j<5;j++)
+	{
+		obj = document.getElementsByName('costEst')[j];
+		if (obj.checked) {fundScore = j+1; break;}
+	}
+	var votValue = "";
+	var votId = "";
+	X = "";
+	Y = "";
+	for(i=1;i<=votArr.length;i++)
+	{
+		tempId = votArr[i-1];
+		inp = document.getElementById("amt"+tempId);
+		votValue = votValue +X +inp.value;
+		X = String.fromCharCode(2);
+
+		votId = votId +Y +votArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+	//alert(votValue +"||" +votId);return;
+
+	//Recommendation
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	var remark = txtRemark.value;
+
+	if ((recomm==1||recomm==2) && (!formatFlag) && (submit==1)){
+		var validateRec=ValidateRecommended();
+		if (validateRec==0){
+			alert("You must mark all main criteria as Yes to recommend this application.");
+			return;
+		}
+	}
+
+	//Check Vot Only at Level 3
+	if ((level==3)&&(submit==1)&&(recomm==1||recomm==2)&&(transType!=2)){
+		calcVotTotal();
+		var ret = validateVot();
+		if (ret==false){ return; }
+	}
+	var ret = #server(MyGrant.WebEvaluation.SaveEvaluation(EvaluationId,ApplicationId,level,recomm,remark,criteriaScore,criteriaId,fundScore,votValue,votId,fieldCom,fieldId,critCom,critComId))#;
+	if (ret>0)
+	{
+		alert('Save successful');
+		if (submit==1)
+			SubmitForm();
+	}
+	else {
+		var failMsg = "Save failed.";
+		if (ret==-1){
+			failMsg+="\nPlease specify reason of your recommendation.";
+		}
+		else if (ret==-2){
+			failMsg+="\nThe application has proceeded to the next level. You are not allowed to edit this evaluation any more.";
+		}
+		alert(failMsg);
+	}
+}
+
+function TickAll()
+{
+	var criteriaScore = "";
+	var criteriaId = "";
+	var X = "";
+	var Y = "";
+	for(i=1;i<=CriteriaNum;i++)
+	{
+		critId = CriteriaIdArr[i-1];
+		score=1;
+		criteriaScore = criteriaScore +X +score;
+		X = String.fromCharCode(2);
+
+		criteriaId = criteriaId +Y +CriteriaIdArr[i-1]
+		Y = String.fromCharCode(2);
+	}
+
+	#server(MyGrant.WebEvaluation.TickAll(EvaluationId,criteriaScore,criteriaId))#;
+	window.location.reload();
+}
+
+function SubmitForm()
+{
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	if (recomm!=3){
+		var str=ValidateCheckBox();
+		if (str!=""){
+			var critId = str.split(String.fromCharCode(4));
+			for (i=0;i<critId.length;i++){
+				var objek=document.getElementById('cID'+critId[i]+'-1');
+				lala=objek.parentNode.parentNode;
+				lala.style.color="red";
+			}
+		alert("Evaluation Incomplete.\nThere are criteria that have not been selected.");
+		return;
+		}
+	}
+
+	var evalID = #server(MyGrant.WebEvaluation.SubmitEval(EvaluationId,ApplicationId,level,bapId))#;
+	if (evalID>0)
+	{
+		alert('Evaluation Completed');
+		backtopage(1);
+	}else {
+		alert("Evaluation Incomplete.");
+	}
+
+}
+
+var childWin;
+function ViewProposal(fieldId)
+{
+	if (childWin && !childWin.closed && childWin.focus){
+		childWin.focus();
+		if (fieldId) childWin.focusField(fieldId);
+  	}
+  	else
+  	{
+	  	var valid = ValidateRemark();
+		if (valid!=0){
+			alert("Please give comment on why these criteria are inappropriate/incorrect.");
+			var focusObj = document.getElementById('cID'+valid+'-2');
+			if (focusObj) /*focusObj.scrollIntoView(true);*/focusObj.focus();
+			return;
+		}
+
+	  	//save all remark first
+	  	var fId="";
+		var fieldCom="";
+		X = "";
+		Y = "";
+		for(i=1;i<=FieldIdArr.length;i++)
+		{
+			var obj = document.getElementById('RmCrit'+FieldIdArr[i-1]);
+			fieldCom = fieldCom +X +obj.value;
+			X = String.fromCharCode(2);
+
+			fId = fId +Y +FieldIdArr[i-1]
+			Y = String.fromCharCode(2);
+		}
+		#server(MyGrant.WebEvaluation.SaveRm(EvaluationId,fId,fieldCom))#;
+
+		//save all criteria
+		var cId="";
+		var criteriaScore="";
+		X = "";
+		Y="";
+		for(i=1;i<=CriteriaIdArr.length;i++)
+		{
+			critId = CriteriaIdArr[i-1];
+			for(j=0;j<2;j++)
+			{
+				score = "";
+				obj = document.getElementsByName('cID'+critId)[j];
+				if (obj.checked) {score = j+1; break;}
+			}
+			criteriaScore = criteriaScore +X +score;
+			X = String.fromCharCode(2);
+
+			cId = cId +Y +CriteriaIdArr[i-1]
+			Y = String.fromCharCode(2);
+
+		}
+		#server(MyGrant.WebEvaluation.SaveCrit(EvaluationId,cId,criteriaScore,fId))#;
+
+		//save vote
+		var votValue = "";
+		var votId = "";
+		X = "";
+		Y = "";
+		for(i=1;i<=votArr.length;i++)
+		{
+			tempId = votArr[i-1];
+			inp = document.getElementById("amt"+tempId);
+			votValue = votValue +X +inp.value;
+			X = String.fromCharCode(2);
+
+			votId = votId +Y +votArr[i-1]
+			Y = String.fromCharCode(2);
+		}
+		#server(MyGrant.WebEvaluation.SaveVot(EvaluationId,votId,votValue))#;
+
+	  	var link=""
+	  	if (transType==2){
+		  	link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationformtrans.cls?bapId="+bapId+"&appId="+ApplicationId+"&evalId="+EvaluationId+"&level="+level+"&type="+contentType+"&comment=1&evaluate=1&fieldId="+fieldId+""))#;
+	  	}
+		else{
+			link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationform.cls?bapId="+bapId+"&appId="+ApplicationId+"&evalId="+EvaluationId+"&level="+level+"&type="+contentType+"&comment=1&evaluate=1&fieldId="+fieldId+""))#;
+		}
+
+		windowprops = "height="+700+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+		childWin = window.open(link, "", windowprops);
+		childWin.resizeTo(1024,screen.availHeight);
+		//window.onblur=true;
+		//childWin.focus();
+		disableText=1;
+		clearInterval(interval);
+   	}
+}
+
+function ContentViewProposal()
+{
+	if (childWin && !childWin.closed && childWin.focus){
+		childWin.focus();
+  	}
+  	else
+  	{
+	  	var link=""
+	  	if (transType==2){
+		  	link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationformtrans.cls?bapId="+bapId+"&appId="+ApplicationId+"&evalId="+EvaluationId+"&level="+level+"&type="+contentType+"&comment=1&evaluate=1"))#;
+	  	}
+		else{
+			link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationform.cls?bapId="+bapId+"&appId="+ApplicationId+"&evalId="+EvaluationId+"&level="+level+"&type="+contentType+"&comment=1&evaluate=1"))#;
+		}
+
+		windowprops = "height="+700+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+		childWin = window.open(link, "", windowprops);
+		childWin.resizeTo(1024,screen.availHeight);
+		disableText=1;
+		clearInterval(interval);
+   	}
+}
+
+function ContentMode()
+{
+	EvalMode=2;
+	btnSave.onclick=ContentSave;
+	btnSubmit.onclick=ContentSubmit;
+	btnViewProp.onclick=ContentViewProposal;
+
+	PanelOnly1.style.display="none";
+	PanelOnly2.style.display="none";
+	PanelOnly3.style.display="none";
+	PanelOnly4.style.display="none";
+}
+
+function ContentSaveAuto()
+{
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	var remark = txtRemark.value;
+
+	var ret=#server(MyGrant.WebEvaluation.ContentSaveEval(bapId,EvaluationId,ApplicationId,level,recomm,remark,1))#;
+	autoSaveState=ret;
+	if (ret>0)
+	{
+		//alert('autoSave successful');
+	}
+	else
+	{
+		var failMsg = "Save failed.";
+		if (ret==-1){
+			failMsg+="\nPlease specify reason of your recommendation.";
+		}
+		if (ret==-2){
+			failMsg+="\nThe application has proceeded to the next level. You are not allowed to edit this evaluation any more.";
+		}
+		alert(failMsg);
+	}
+}
+
+function ContentSave()
+{
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	var remark = txtRemark.value;
+
+	var ret=#server(MyGrant.WebEvaluation.ContentSaveEval(bapId,EvaluationId,ApplicationId,level,recomm,remark))#;
+	if (ret>0)
+	{
+		alert('Save successful');
+	}
+	else
+	{
+		var failMsg = "Save failed.";
+		if (ret==-1){
+			failMsg+="\nPlease specify reason of your recommendation.";
+		}
+		if (ret==-2){
+			failMsg+="\nThe application has proceeded to the next level. You are not allowed to edit this evaluation any more.";
+		}
+		alert(failMsg);
+	}
+}
+
+function ContentSubmit()
+{
+	var recomm = recommend.options[recommend.selectedIndex].value;
+	var remark = txtRemark.value;
+
+	if (recomm==""){
+		alert("Please choose a Recommendation to submit the evaluation.");
+		return;
+	}
+
+	var ret=#server(MyGrant.WebEvaluation.ContentSaveEval(bapId,EvaluationId,ApplicationId,level,recomm,remark))#;
+	if (ret>0)
+	{
+		//alert('Save successful');
+		var evalID = #server(MyGrant.WebEvaluation.SubmitEval(EvaluationId,ApplicationId,level,bapId))#;
+		if (evalID>0)
+		{
+			alert('Evaluation Completed');
+			backtopage(1);
+		}else {
+			var failMsg = "Evaluation Incomplete.";
+			if (evalID==-2)
+				failMsg+="\nThe application was reverted back to the applicant for revision/correction. ";
+
+			alert(failMsg);
+		}
+	}
+	else
+	{
+		var failMsg = "Save failed.";
+		if (ret==-2){
+			failMsg+="\nThe application has proceeded to the next level. You are not allowed to edit this evaluation any more.";
+		}
+		alert(failMsg);
+	}
+}
+
+function ViewModeProposal()
+{
+	if (childWin && !childWin.closed && childWin.focus){
+		childWin.focus();
+  	}
+  	else
+  	{
+	  	var link=""
+		if (transType==2){
+			link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationformtrans.cls?appId="+ApplicationId+"&comment=1&evaluateV=1&level="+level+""))#;
+		}
+		else{
+			link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationform.cls?appId="+ApplicationId+"&comment=1&evaluateV=1&level="+level+""))#;
+		}
+
+		windowprops = "height="+700+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+		childWin = window.open(link, "", windowprops);
+		childWin.resizeTo(1024,screen.availHeight);
+		disableText=1;
+  	}
+}
+
+function ViewPrevEval()
+{
+	/*if (level==1) {
+		alert("Previous evaluation data does not exists.");
+		return;
+	}*/
+
+	//var ret = showModalDialog(#server(..Link("%25cspapp.bi.work.mygrant.custom.prevevaluationsum.cls?vvAppId="+ApplicationId+"&vvLevel="+level))#,"self","center=yes;dialogWidth=900px;dialogHeight=510px;status=no;scroll=yes;help=no;resizable=yes");
+	var link=#server(..Link("%25cspapp.bi.work.mygrant.custom.prevevaluationsum.cls?vvAppId="+ApplicationId+"&vvLevel=3"))#;
+	var windowprops = "height="+700+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+	var rr = window.open(link, "", windowprops);
+	rr.resizeTo(1024,screen.availHeight);
+}
+
+function ValidateNum(obj)
+{
+	n = obj.value;
+	if (n=="")
+	{
+		calcVotTotal();
+		return;
+	}
+	if (!isNumber(n))
+	{
+		alert("Only numbers are allowed.");
+		obj.value = "";
+		obj.style.borderColor="red";
+		obj.focus();
+	}
+	else{
+		obj.style.borderColor="";
+	}
+	calcVotTotal();
+}
+function isNumber(n) {
+  	return !isNaN(parseFloat(n)) && isFinite(n) && n >= 0;
+}
+
+function hl(obj)
+{
+	obj.style.color = "#336699";
+	obj.style.backgroundColor = "#EEF5FF";
+}
+function ll(obj)
+{
+	obj.style.color = "";
+	obj.style.backgroundColor = "#EEE";
+}
+function ll2(obj)
+{
+	obj.style.backgroundColor = "#FFF";
+}
+
+function trigRadio(id)
+{
+	var obj=document.getElementById(id);
+	if (obj) {
+		obj.checked = true;
+		CountCriteriaScore();
+	}
+}
+
+function backtopage(idx)
+{
+	switch(idx)
+	{
+		case 0:
+		window.history.back();
+		break;
+
+		case 1:
+		if (onBehalfPanel!=""&&bapId!=""){
+			window.opener.location.reload(false);
+			self.close ();
+		}
+		else{
+			//var link = #server(..Link("%25cspapp.bi.work.mygrant.custom.evaluationlist.cls?batchId="+batchId+""))#;
+			var link = #server(..Link("%25cspapp.bi.work.mygrant.custom.evaluationlistv2.cls"))#;
+			window.location.href=link;
+		}
+		break;
+
+		default:
+		break;
+	}
+}
+
+function ShowNote()
+{
+	if (recommend.selectedIndex==-1) return;
+	var div=document.getElementById("noteDiv");
+	if (level==1 && recommend.options[recommend.selectedIndex].value!=3)
+		div.style.display="block";
+	else
+		div.style.display="none";
+}
+
+function Semantics()
+{
+	var link=#server(..Link("%25cspapp.bi.work.mygrant.custom.simcheck.cls?appId="+ApplicationId))#;
+	var windowprops = "height="+700+"px,width="+1024+"px,location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+	var rr = window.open(link, "", windowprops);
+	//rr.resizeTo(1024,screen.availHeight);
+}
+function ViewCurrComment()
+{
+	var currLvl = (parseInt(level)+1);
+	var link=#server(..Link("%25cspapp.bi.work.mygrant.custom.evaluationcomment.cls?vvAppId="+ApplicationId+"&vvLevel="+currLvl))#;
+	var windowprops = "height="+700+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+	var rr = window.open(link, "", windowprops);
+	rr.resizeTo(1024,screen.availHeight);
+}
+
+function ShowDetailEval(id,lvl)
+{
+	//alert("This feature will be available soon.");
+	var link = #server(..Link("%25cspapp.bi.work.mygrant.custom.evaluationform.cls?appId="+ApplicationId+"&level="+lvl+"&view="+id))#;
+	var windowprops = "height="+600+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+	var childWin = window.open(link, "", windowprops);
+	childWin.resizeTo(1024,screen.availHeight);
+}
+
+function ShowProposal(appId,evaluatorId,type)
+{
+	var link = #server(..Link("%25cspapp.bi.work.mygrant.custom.applicationform.cls?appId="+appId+"&comment=1&level="+level+"&type="+type+"&evaluatorId="+evaluatorId))#;
+	var windowprops = "height="+600+",width="+1024+",location=no,scrollbars=yes,menubars=no,toolbars=no,resizable=yes,dependent=yes,status=no";
+	var childWin = window.open(link, "", windowprops);
+	childWin.resizeTo(1024,screen.availHeight);
+}
+
+function copyCom(){
+	var text = "";
+	SaveAuto();
+	var allTxt = #server(MyGrant.WebEvaluation.RetrieveAllComments(EvaluationId))#;
+	document.getElementById("txtRemark").value=allTxt;
+	/*
+	var g = document.getElementsByName("comAreaN");
+	for (var i=0;i<g.length;i++){
+		 if (g[i].value!=""){
+			 text += g[i].value + '\n';
+		}
+	}
+	document.getElementById("txtRemark").value=text;
+	*/
+}
+
+</script>
+</head>
+
+<body height=100% onload='init();timer()' onfocus=refreshRm() onblur=refreshRm()>
+	<table border=0 width=100%  class="title pNShow" style="border-bottom-style:solid;border-bottom-color:#cccccc;border-bottom-width:1px;padding:5px;border-spacing: 0px">
+			<tr>
+				<td><img src="work/mygrant/custom/img/32x32/document_mark_as_final.png" style=border-style:none; width="32" height="32"></td>
+				<td width=100%><font size=4>Evaluation &#8250; </font><font size=2 color=grey>Evaluation Form</font></td>
+				<td align=right>
+					<script language="cache" runat="server">
+						i view=""{
+							d expiryDate^myGrant.Eval(ApplicationId,level)
+						}
+					</script>
+				</td>
+			</tr>
+	</table>
+	<div id='autoSaveReminder' style='text-align:right;display:none'>Auto-save Enabled</div>
+	<div class=sysNote style='display:#($S(bypassedEval=1:"block",1:"none"))#;'>This application has went through resubmission, please check the comments you have saved previously to ensure they are still applicable.</div>
+	<div style='padding:20px' height=100%>
+				<table class=box width="100%" height=100% align="center" cellpadding="15px" cellspacing="0">
+					<tr>
+        				<td height=20px class="secTitle">Evaluation Details</td>
+      				</tr>
+      				<tr>
+       				 	<td height="20">
+							<table width="100%" border="1" align="center" cellpadding="0" cellspacing="0" class="filledBox">
+          						<tr >
+            						<td width=100px>Evaluation Level</td>
+            						<td >#($s((level=1):"IPT Panel",(level=2):"RMC",(level=3):"KPM Panel",(level=4):"KPM Head Of Panel",(level=5):"J/K Induk",(level=6):"KPM Final Endorsement"))#</td>
+            						<td width=1%>
+            						<CSP:IF Condition='level=3'>
+            							<input id='btnViewPrev' type=button value='View Evaluation History' onclick=ViewPrevEval() >
+            						</CSP:IF>
+            						</td>
+            					</tr>
+            					<tr>
+            						<td>Evaluator</td>
+            						<td>#($G(evaluatorName))#</td>
+            						<td>
+	            						<CSP:IF Condition='level=3'>
+	            							<span id="simAlert"></span>
+	            							<input id="simBtn" type=button value='Similarity Check' onclick=Semantics()>
+	            						</CSP:IF>
+            						</td>
+            					</tr>
+            					<CSP:IF CONDITION='isSubProj=1'>
+            					<tr>
+            						<td>Program Title</td>
+            						<td><a href='#("%25cspapp.bi.work.mygrant.custom.applicationformtrans.cls?appId="_programId_"")#' target='_blank'>#(progTitle)#</a></td>
+            						<td></td>
+            					</tr>
+            					</CSP:IF>
+            					<tr >
+            						<td>#($s((transType=2):"Program Title",1:"Project Title"))#</td>
+            						<td ><a href='#($s((transType=2):"%25cspapp.bi.work.mygrant.custom.applicationformtrans.cls?appId="_ApplicationId_"",1:"%25cspapp.bi.work.mygrant.custom.applicationform.cls?appId="_ApplicationId_""))#' target='_blank'>#(Title)#</a></td>
+            						<td >
+            							<input id='btnViewProp' type=button value='View/Comment On Proposal' onclick=ViewProposal()>
+            							<input id='btnViewModeProp' type=button value='View Proposal' style='display:none' onclick=ViewModeProposal()>
+            						</td>
+            					</tr>
+            					<tr >
+            						<td>#($s((transType=2):"Program Leader",1:"Project Leader"))#</td><!--input type=button value='tick all' onclick=TickAll()-->
+            						<td colspan=2><a href=#(..Link("%25cspapp.bi.work.mygrant.custom.mainregistrationform.cls?userId="_pLeaderId_"&appId="_ApplicationId_""))# target='blank'>#(pLeader)#</a></td>
+            					</tr>
+          					</table>
+						</td>
+					</tr>
+					<script language="cache" runat="server">
+						if (transType=2)
+						{
+							w "<tr>"
+      						w "<td class='secTitle' height='20px'>Sub Projects Evaluation</td>"
+      						w "</tr>"
+      						w "<tr>"
+       						w "<td height=""20"" align=""right"">"
+							w "<table style=""text-align:center"" width=""100%"" border=""1"" align=""center"" cellpadding=""0"" cellspacing=""0"" class=""filledBox"">"
+          					w "<tr class='title'>"
+							w "	<td rowspan=2>No.</td> "
+							w "	<td width='25%' rowspan=2>Recommendation</td> "
+    						w "	<td width='25%' rowspan=2>Remarks</td> "
+   							w "	<td width='25%' rowspan=2>Evaluator</td>"
+    						w "	<td width='1%' rowspan=2>Version</td>"
+   							w "	<td width='25%' colspan=2>View Details</td>"
+    						w "</tr>"
+    						w "<tr class=title>"
+    						w "	<td>Evaluation Form</td>"
+    						w "	<td>Comments on Proposal</td>"
+    						w "</tr>"
+    						s subId = $$getTransSubs^myGrant.PrevEval(ApplicationId,1)
+          					s subIdList = $lfs(subId,",")
+
+          					for i=1:1:$ll(subIdList)
+          					{
+	          					d PrevEvalSumTrans^myGrant.PrevEval($lg(subIdList,i),level)
+	          				}
+
+    						w "</table>"
+    						w "</tr>"
+						}
+					</script>
+
+					<!--06032017 Qayyuum  - Added Project Leader KPT Project Record-->
+					<script language="cache" runat="server">
+						w "<tr>"
+  						w "<td class='secTitle' height='20px'>Previous MOHE Projects by Project Leader</td>"
+  						w "</tr>"
+  						w "<tr>"
+   						w "<td height=""20"" align=""right"">"
+						w "<table style=""text-align:center"" width=""100%"" border=""1"" align=""center"" cellpadding=""0"" cellspacing=""0"" class=""filledBox"">"
+      					w "<tr class='title'>"
+						w "	<td rowspan=2 width='25%' rowspan=2>Project Title</td> "
+						w "	<td width='3%' rowspan=2>Grant</td> "
+						w "	<td width='3%' rowspan=2>Progress (%)</td>"
+						w "	<td width='3%' rowspan=2>Status</td>"
+						w "	<td width='25%' colspan=5>KPI</td>"
+						w "</tr>"
+						w "<tr class=title>"
+						w "	<td>Master Student</td>"
+						w "	<td>PhD Student</td>"
+						w "	<td>Publication</td>"
+						w "	<td>IP</td>"
+						w "	<td>Prototype</td>"
+						w "</tr>"
+
+						// Record is added here
+						s record = $$getPastProjectRecords^myGrant.EvalProject(pLeaderId)
+						i (record=0) {
+							w "<tr>"
+	  						w "<td colspan=9>No records found</td>"
+	  						w "</tr>"
+						}
+						w "</table>"
+						w "</tr>"
+					</script>
+					<tr id="PanelOnly1">
+						<td height=20px class="secTitle">Summary of Assessment<input type='button' id='btnSummComm' class='titleBtn' value='Summary of Comments' title='Click to view all comments made in proposal' onclick='ViewCurrComment()'></input>
+						</td>
+					<tr/>
+					<tr height=100%  id="PanelOnly2">
+						<td height="100%">
+							<table width="100%" height=100% border="0" align="center" cellpadding="0" cellspacing="0">
+          						<tr height=100%>
+            						<td colspan=2 height=100%>
+            							<div height=100%>
+            								<CSP:IF Condition="'formatFlag">
+											<table class=filledBox border=1 width=100% height=100%>
+												<tr class=title>
+													<th style='width:50%'>Assessment Criteria</th>
+													<th style='width:20px' align=center><img src="work/mygrant/custom/img/check-icon.PNG" style=border-style:none; width="24" height="20"></img></th>
+													<th style='width:20px' align=center><img src="work/mygrant/custom/img/cross-icon.png" style=border-style:none; width="24" height="20"></img></th>
+													<th style='width:50%' align=center>Comment - A must for (X) Overall</th>
+												</tr>
+												<script language="cache" runat="server">
+												d LoadCriteria^myGrant.Eval(ApplicationId)
+
+												w "<tr class='totalCount' height=100% style='background-color:#EEEEEE;'>"
+												w "	<td height=100%>Total-Main</td>"
+												w "	<td height=100% id='tdMainCriteriaScore0'>7</td>"
+												w "	<td height=100% id='tdMainCriteriaScore1'>1</td>"
+												w "	<td height=100% rowspan=2 style='background-color:#FFF'></td>"
+												w "</tr>"
+												w "<tr class='totalCount' height=100%>"
+												w "	<td height=100%>Total-Sub</td>"
+												w "	<td height=100% id='tdSubCriteriaScore0'>7</td>"
+												w "	<td height=100% id='tdSubCriteriaScore1'>1</td>"
+												w "</tr>"
+												</script>
+											</table>
+											<CSP:ELSE>
+											<table class=filledBox border=1 width=100% height=100%>
+												<tr class=title>
+													<th style='width:50%'>Assessment Criteria</th>
+													<th style='width:10%' align=center>Poor</th>
+													<th style='width:10%' align=center>Inadequate</th>
+													<th style='width:10%' align=center>Acceptable</th>
+													<th style='width:10%' align=center>Good</th>
+													<th style='width:10%' align=center>Very Good</th>
+												</tr>
+												<script language="cache" runat="server">
+												d LoadCriteriaOld^myGrant.Eval
+
+												w "<tr class='totalCount' height=100% style='background-color:#EEEEEE;'>"
+												w "	<td height=100%>Total-Main</td>"
+												w "	<td height=100% id='tdMainCriteriaScore0'></td>"
+												w "	<td height=100% id='tdMainCriteriaScore1'></td>"
+												w "	<td height=100% id='tdMainCriteriaScore2'></td>"
+												w "	<td height=100% id='tdMainCriteriaScore3'></td>"
+												w "	<td height=100% id='tdMainCriteriaScore4'></td>"
+												w "</tr>"
+												w "<tr class='totalCount' height=100%>"
+												w "	<td height=100%>Total-Sub</td>"
+												w "	<td height=100% id='tdSubCriteriaScore0'></td>"
+												w "	<td height=100% id='tdSubCriteriaScore1'></td>"
+												w "	<td height=100% id='tdSubCriteriaScore2'></td>"
+												w "	<td height=100% id='tdSubCriteriaScore3'></td>"
+												w "	<td height=100% id='tdSubCriteriaScore4'></td>"
+												w "</tr>"
+												</script>
+											</table>
+											</CSP:IF>
+										</div>
+									</td>
+          						</tr>
+          					</table>
+						</td>
+					</tr>
+					<tr  id="PanelOnly3" style='display:#($s((transType=2):"none",1:"table-row"))#;'>
+						<td height=20px class="secTitle">Recommended Funding</td>
+					</tr>
+					<tr  id="PanelOnly4" style='display:#($s((transType=2):"none",1:"table-row"))#;'>
+       				 	<td height="100%">
+							<table width="99%" border="0" align="center" cellpadding="0" cellspacing="0">
+          						<tr>
+            						<td colspan=2>
+            							<div>
+											<table width="100%" border="1" align="center" cellpadding="0" cellspacing="0" class="filledBox">
+												<tr class="title">
+													<td style='width:50%'></td>
+													<td style='width:10%' align=center>Poor</td>
+													<td style='width:10%' align=center>Inadequate</td>
+													<td style='width:10%' align=center>Acceptable</td>
+													<td style='width:10%' align=center>Good</td>
+													<td style='width:10%' align=center>Very Good</td>
+												</tr>
+												<tr>
+													<td id='tdce' style='font-weight:bold;cursor:pointer;height:100%;background-color:#EEE' onmouseover=hl(this) onmouseout=ll(this) onclick=ViewProposal(16)>Appropriateness of Cost Estimates</td>
+													<td align=center onclick=trigRadio('ce1') onmouseover=hl(this) onmouseout=ll2(this)><input type=radio name=costEst id=ce1 value=0 ></td>
+		        									<td align=center onclick=trigRadio('ce2') onmouseover=hl(this) onmouseout=ll2(this)><input type=radio name=costEst id=ce2 value=0 ></td>
+		        									<td align=center onclick=trigRadio('ce3') onmouseover=hl(this) onmouseout=ll2(this)><input type=radio name=costEst id=ce3 value=0 ></td>
+		       										<td align=center onclick=trigRadio('ce4') onmouseover=hl(this) onmouseout=ll2(this)><input type=radio name=costEst id=ce4 value=0 ></td>
+		        									<td align=center onclick=trigRadio('ce5') onmouseover=hl(this) onmouseout=ll2(this)><input type=radio name=costEst id=ce5 value=0 ></td>
+		        								</tr>
+											</table><br>
+										</div>
+										<div>
+											<table width="100%" border="1" align="center" cellpadding="0" cellspacing="0" class="filledBox" id=votTable>
+          										<tr class="title">
+                									<th width="40%" >Cost Category</th>
+                									<th width="25%" >Proposed Funding (RM)</th>
+               										<th width="25%" >Recommended Funding (RM)</th>
+               										<th width="10%" >Percentage</th>
+              									</tr>
+              									<script language="cache" runat="server">
+              									d ListVotComplete^myGrant.Eval(batchId)
+              									</script>
+              									<tr>
+              										<td><B>Total</B></td>
+              										<td align=right id=proposedT style=font-weight:bold></td>
+              										<td align=right id=recoT style=font-weight:bold></td>
+              										<td align=right id=pctT style=font-weight:bold></td>
+              									</tr>
+          									</table>
+										</div>
+            						</td>
+          						</tr>
+          					</table>
+						</td>
+					</tr>
+
+					<tr>
+						<!--td height=20px class="secTitle">Recommendation To RMC</td-->
+						<CSP:IF Condition='level=3'>
+            				<td height=20px class="secTitle">Recommendation To HOP</td>
+            			<CSP:ELSE>
+            				<td height=20px class="secTitle">Recommendation To RMC</td>
+            			</CSP:IF>
+					<tr>
+					<tr>
+       				 	<td height="100%">
+							<table width="100%" border="1" align="center" cellpadding="0" cellspacing="0" class="filledBox">
+          						<tr class="contentBgColor" valign=top>
+            						<td width=20%>Recommendation</td>
+            						<td width=80%>
+										<select name="recommend" id="recommend" onchange=ShowNote()>
+										<option value=''></option>
+										<script language="cache" runat="server">
+										if (view=""){
+											if (level=1),(type=1)!(type="")
+											{
+												w:(noHighRec'=1) "<option value='2'>Highly Recommended</option>"
+												w "<option value='1'>Recommended</option>"
+												w "<option value='0'>Not Recommended (Please specify reason)</option>"
+												w "<option value='3'>Resubmission (Please specify reason)</option>"
+											}
+											elseif (level=3),(type=1)!(type="")
+											{
+												w:(noHighRec'=1) "<option value='2'>Highly Recommended</option>"
+												w "<option value='1'>Recommended</option>"
+												w "<option value='0'>Not Recommended (Please specify reason)</option>"
+												w:(KPMResub=1) "<option value='3'>Resubmission (Please specify reason)</option>"
+											}
+											elseif (level=1),(type=2)
+											{
+												w "<option value='1'>Comply</option>"
+												w "<option value='0'>Not Comply (Please specify reason)</option>"
+												w "<option value='3'>Resubmission (Please specify reason)</option>"
+											}
+										}else{
+											w "<option value='2'>Highly Recommended</option>"
+											w "<option value='1'>Recommended</option>"
+											w "<option value='0'>Not Recommended (Please specify reason)</option>"
+											w "<option value='3'>Resubmission (Please specify reason)</option>"
+										}
+
+										</script>
+										</select>
+										<div id='noteDiv' class='sysNote' style='padding-top:5px;display:none'>
+											*Please note that you need to choose "Resubmission" to resubmit this application back to the project leader for revision.
+										</div>
+										<div id='noteProgDiv' class='sysNote' style='padding-top:5px;display:none'>
+											You are not allowed to submit this evaluation yet as the project(s) are pending for evaluation.
+										</div>
+									</td>
+								</tr>
+								<tr class="contentBgColor" >
+            						<td>Overall Remark</td>
+									<td>
+        								<button style='width=20px;' title='All comments made will be copied to the Overall Remark' onclick='copyCom()'><span>Retrieve All Comments</span></button>
+										<csp:if condition='formatFlag=0'>
+            							<div style='display:block'>
+											<csp:if condition='level=3 && formatFlag=0'>
+	            								<button style='width=20px;' title='Tick all as Yes' onclick='TickAll()'><span>Tick All</span></button>
+	            							</csp:if>
+            							</div>
+            							</csp:if>
+
+            							<!--div>
+            								<button style='width=20px;' title='Tick all as Yes' onclick='TickAll()'><div>Tick All</div></button>
+            							</div-->
+										<textarea rows="5" cols=50 id="txtRemark" style='width:99%'></textarea>
+									</td>
+          						</tr>
+          					</table>
+						</td>
+					</tr>
+					<tr align=center>
+						<td style="padding:5px;" id='btnColumn'>
+							<input style='width:140px;' id='btnBack' type=button value=Back onclick=backtopage(0)>
+							<input style='width:140px;' id='btnSave' type=button value=Save onclick=Save(0)>
+							<input style='width:140px;' id='btnSubmit' type=button value=Submit onclick=Save(1)>
+						</td>
+					</tr>
+				</table>
+	</div>
+
+<script language="cache" runat="server">
+s endDate=application.BatchId.AppEndDate
+i ((level=1)&&($p($h,",",1)>endDate)){
+	w "<script>btnSave.style.display=""none"";btnSubmit.style.display=""none"";</s"_"cript>"
+}
+</script>
+
+<script type="text/javascript">
+function alertSimilar(){
+	//alert(simVal);
+	if (level==3 && simVal >= 0.3) {
+		var simTxt = document.getElementById("simAlert");
+		if (simTxt) {
+			simTxt.innerHTML = (simVal*100).toFixed(2) + "% similarity detected!";
+			simTxt.style.display = "inline";
+		}
+	}
+}
+alertSimilar();
+
+function disableSubmit(){
+	if (level==3 && allowProgEval==0) {
+		var btnSubmit = document.getElementById("btnSubmit");
+		btnSubmit.disabled = "true";
+		var note = document.getElementById("noteProgDiv");
+		note.style.display = "block";
+	}
+}
+disableSubmit();
+</script>
+</body>
+</html>

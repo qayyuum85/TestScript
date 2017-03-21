@@ -58,9 +58,9 @@ class SainsMakluman(scrapy.Spider):
     start_urls = ['http://www.sainswater.com/index.php/ms-MY/2-uncategorised/76-maklumat-bekalan-air?tmpl=component']
 
     def parse(self, response):
-        def createItem(date, text, url):
+        def createItem(date, text, url, ctr):
             item = dict()
-            item['title'] = 'Maklumat Gangguan Bekalan Air ' + date
+            item['title'] = 'Maklumat Gangguan Bekalan Air (' + str(ctr) + ') ' + date
             item['text'] = text
             item['page_link'] = response.url
             item['file_link'] = ''
@@ -69,13 +69,15 @@ class SainsMakluman(scrapy.Spider):
 
         trs = response.xpath("//table/tr[*]")
         url = response.url
+        ctr = 0
         for tr in trs:
             isDateExist = tr.xpath("td[*]/strong/text()").extract_first() is not None
             isTextExist = tr.xpath("td[*]/p").extract_first() is not None
             if isDateExist is True and isTextExist is True:
+                ctr = ctr + 1
                 date = tr.xpath("td[*]/strong/text()").extract_first()
                 text = tr.xpath("td[*]/p").extract_first()
-                thisItem = createItem(date=date, text=text, url=url)
+                thisItem = createItem(date=date, text=text, url=url, ctr=ctr)
 
                 main = dict()
                 main['category'] = 'SAINS'

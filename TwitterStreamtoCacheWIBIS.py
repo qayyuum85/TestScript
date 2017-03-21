@@ -15,27 +15,27 @@ password = secrets['PASSWORD'];
 host = secrets['HOST'];
 port = secrets['PORT'];
 
-class listener(StreamListener):
-    def on_data(self, data):
-        d = json.loads(data)
-        print(d['text'])
-        twMsg = database.create_new("%BI.TweetMessage", None)
-        twMsg.set("DateCreated", d['created_at'])
-        twMsg.set("TweetMessage", d['text'])
-        twMsg.set("Username", d['user']['screen_name'])
-        twMsg.set("TweetID", d['id_str'])
-
-        urls = d['entities']['urls']
-        for url in urls:
-            twMsg.run_obj_method("AddLink", [url['expanded_url']])
-
-        twMsg.run_obj_method("%Save",[])
-        return True
-
-    def on_error(self, status):
-        print (status)
-
 try:
+    class listener(StreamListener):
+        def on_data(self, data):
+            d = json.loads(data)
+            print(d['text'])
+            twMsg = database.create_new("%BI.TweetMessage", None)
+            twMsg.set("DateCreated", d['created_at'])
+            twMsg.set("TweetMessage", d['text'])
+            twMsg.set("Username", d['user']['screen_name'])
+            twMsg.set("TweetID", d['id_str'])
+
+            urls = d['entities']['urls']
+            for url in urls:
+                twMsg.run_obj_method("AddLink", [url['expanded_url']])
+
+            twMsg.run_obj_method("%Save",[])
+            return True
+
+        def on_error(self, status):
+            print (status)
+
     # Connect to specified machine, in the SAMPLES namespace
     url = host + "["+port+"]:" + ns
     conn = intersys.pythonbind3.connection()
@@ -55,7 +55,7 @@ except KeyboardInterrupt:
     sys.exit()
 
 except AttributeError as e:
-    print('AttributeError was returned, stupid bug')
+    print('AttributeError was returned')
     pass
 
 except tweepy.TweepError as e:

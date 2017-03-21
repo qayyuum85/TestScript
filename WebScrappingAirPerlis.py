@@ -8,7 +8,7 @@ urlSAP = 'http://www.airperlis.com.my/index.php/en/'
 htmlSAP = rq.urlopen(urlSAP).read()
 soup = BeautifulSoup(htmlSAP, 'html.parser')
 articles = soup.find_all('article')
-title = articles[0].find('li').string
+title = str(articles[0].p.get_text())
 
 # article content
 def get_content(soupObject):

@@ -25,7 +25,8 @@ print(r'python C:\InterSystems\Cache\CSP\sys\bi\python\TwitterStreamtoCacheWIBIS
 class listener(StreamListener):
     def on_data(self, data):
         d = json.loads(data)
-        print(d['text'])
+        #print(d['text'])
+        print('Tweet found at' + str(d['created_at']) + ' by ' + str(d['user']['screen_name']))
         twMsg = database.create_new("%BI.TweetMessage", None)
         twMsg.set("DateCreated", d['created_at'])
         twMsg.set("TweetMessage", d['text'])

@@ -8,10 +8,10 @@ configId = sys.argv[1]
 ns = sys.argv[2]
 
 secrets = getprops("WIBIS.properties")
-user = secrets['USERNAME'];
-password = secrets['PASSWORD'];
-host = secrets['HOST'];
-port = secrets['PORT'];
+user = secrets['USERNAME']
+password = secrets['PASSWORD']
+host = secrets['HOST']
+port = secrets['PORT']
 
 try:
     # Connect to specified machine, in the SAMPLES namespace

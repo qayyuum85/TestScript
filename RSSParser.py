@@ -22,8 +22,13 @@ limit = 12 * 3600 * 1000
 #
 # function to get the current time
 #
-current_time_millis = lambda: int(round(time.time() * 1000))
+
+
+def current_time_millis(): return int(round(time.time() * 1000))
+
+
 current_timestamp = current_time_millis()
+
 
 def post_is_in_db(title):
     with open(db, 'r', encoding="utf8") as database:
@@ -33,6 +38,8 @@ def post_is_in_db(title):
     return False
 
 # return true if the title is in the database with a timestamp > limit
+
+
 def post_is_in_db_with_old_timestamp(title):
     with open(db, 'r', encoding="utf8") as database:
         for line in database:
@@ -42,6 +49,7 @@ def post_is_in_db_with_old_timestamp(title):
                 if current_timestamp - ts > limit:
                     return True
     return False
+
 
 #
 # get the feed data from the url
@@ -80,7 +88,8 @@ count = 1
 blockcount = 1
 for title in posts_to_print:
     if count % 5 == 1:
-        print("\n" + time.strftime("%a, %b %d %I:%M %p") + '  ((( ' + feed_name + ' - ' + str(blockcount) + ' )))')
+        print("\n" + time.strftime("%a, %b %d %I:%M %p") +
+              '  ((( ' + feed_name + ' - ' + str(blockcount) + ' )))')
         print("-----------------------------------------\n")
         blockcount += 1
     print(title + "\n")

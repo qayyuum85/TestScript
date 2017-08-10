@@ -2,14 +2,16 @@ import urllib.request as rq
 import re
 from bs4 import BeautifulSoup
 import json
-from  WebScrappingUtilWIBIS import save_to_DB
+from WebScrappingUtilWIBIS import save_to_DB
 
 urlLUAS = 'http://www.luas.gov.my/v3/my/luas/arkib/pengumuman'
 htmlLUAS = rq.urlopen(urlLUAS).read()
 soup = BeautifulSoup(htmlLUAS, 'html.parser')
 
+
 def get_announcement_rows(tag):
-    return tag.name=='tr' and tag.has_attr('class')
+    return tag.name == 'tr' and tag.has_attr('class')
+
 
 announcements = soup.find_all(get_announcement_rows)
 links = []
@@ -25,7 +27,8 @@ for link in list(fulllinks):
     soup = BeautifulSoup(eachhtmlLUAS, 'html.parser')
 
     # date
-    rawdate = re.sub(pattern=r'\n+|\t+', repl='', string=soup.find('time').string)
+    rawdate = re.sub(pattern=r'\n+|\t+', repl='',
+                     string=soup.find('time').string)
     date = re.sub(pattern=r'^\s+', repl='', string=rawdate.split(':')[1])
 
     # content
@@ -34,7 +37,8 @@ for link in list(fulllinks):
 
     # title
     elements = soup.find(class_='article-title')
-    title = re.sub(pattern=r'\n+|\t+', repl='', string=list(elements.strings)[0])
+    title = re.sub(pattern=r'\n+|\t+', repl='',
+                   string=list(elements.strings)[0])
 
     item = dict()
     item['date'] = date

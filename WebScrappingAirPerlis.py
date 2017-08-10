@@ -2,7 +2,7 @@ import urllib.request as rq
 import re
 from bs4 import BeautifulSoup
 import json
-from  WebScrappingUtilWIBIS import save_to_DB
+from WebScrappingUtilWIBIS import save_to_DB
 
 urlSAP = 'http://www.airperlis.com.my/index.php/en/'
 htmlSAP = rq.urlopen(urlSAP).read()
@@ -11,9 +11,12 @@ articles = soup.find_all('article')
 title = str(articles[0].p.get_text())
 
 # article content
+
+
 def get_content(soupObject):
     formattedContent = soupObject.prettify(formatter="html")
     return re.sub(pattern=r'\n', repl='', string=formattedContent)
+
 
 contents = []
 item = dict()

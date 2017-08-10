@@ -1,0 +1,905 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+
+    <title> Network Graph </title>
+    <meta http-equiv="X-UA-Compatible" charset="UTF-8" content="IE=edge">
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha256-k2WSCIexGzOj3Euiig+TlR8gA0EmPjuc79OEeY5L45g=" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="js/vis.js"></script>
+    <script type="text/javaScript" src="js/tab.js"></script>
+    <link href="css/vis.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+        function queryServer(query, type) {
+            return# server( % BI.Graph.Connector.Query(query, type))#;
+        }
+
+        var data;
+
+        function submitQry() {
+            var errStr;
+            var query = $("#txtQry").val();
+            var result = queryServer(query, "graph");
+            var res = JSON.parse(result);
+            if (res.errors.length > 0) {
+                res.errors.forEach(function(o) {
+                    errStr += "Status Code: " + o.code + "\n" + "Error Message: " + o.message + "\n";
+                });
+                $("#resultBox").text(errStr);
+                return;
+            }
+            $("#resultBox").text(result);
+            var data = convert(result);
+            buildGraph(data);
+        }
+
+        function edgesColor(c) {
+            var colorTemplate = {
+                "CALLS": "#ff0000",
+                "FRIEND_OF": "#27ae60",
+                "WORKS_AT": "#dc7633"
+            };
+
+            return colorTemplate[c];
+        }
+
+        function nodesColor(c) {
+            var colorTemplate = {
+                "Person": "#00FF00",
+                "Company": "#FFC0CB",
+                "BankAccount": "#85c1e9",
+                "CreditCard": "#bb8fce",
+                "Loan": "#FFC300"
+            };
+
+            return colorTemplate[c];
+        }
+
+        var nodes,
+            links,
+            nodeIds,
+            dataSetNodes,
+            dataSetEdges;
+
+        function convert(stringJSON) {
+
+            nodes = [],
+                links = [],
+                nodeIds = [];
+
+            var res = JSON.parse(stringJSON);
+            convertData(res.results[0].data, res.results[0].columns);
+            dataSetNodes = new vis.DataSet(nodes);
+            dataSetEdges = new vis.DataSet(links);
+
+            var viz = {
+                nodes: dataSetNodes,
+                edges: dataSetEdges
+            };
+
+            return viz;
+        }
+
+        function convertData(res, columnDesc, parsedType, getEnterSet) {
+            var newNodes = [],
+                newLinks = [];
+
+            var idIndex = function idIndex(a, id) {
+                for (var i = 0; i < a.length; i++) {
+                    if (a[i].id == id)
+                        return id;
+                }
+                return null;
+            };
+
+            var hasLinks = function hasLinks(a, id) {
+                for (var j = 0; j < a.length; j++) {
+                    if (a[j].id == id)
+                        return false;
+                }
+                return true;
+            };
+
+            var dataObj = function(columnDesc) {
+                var columnDesc = columnDesc;
+                return function(rowData) {
+                    var obj = {};
+                    if (columnDesc != null) {
+                        rowData.forEach(function(row, rowIdx) {
+                            obj[columnDesc[rowIdx]] = row;
+                        });
+                        return obj;
+                    }
+                    return null;
+                };
+            }(columnDesc);
+
+            var uniqueRelationship = function getUniqueRelationship(relationships) {
+                // Make sure only unique relationship exists
+                var filteredRelationship = relationships.filter(function(r) {
+                    return (hasLinks(links, r.id));
+                });
+
+                // Convert found, unique relationships to edges object
+                var mappedRelationship = filteredRelationship.map(function(r) {
+                    var currLink = {
+                        from: r.startNode,
+                        to: r.endNode,
+                        id: parseInt(r.id),
+                        label: r.type,
+                        color: edgesColor(r.type)
+                    };
+                    return currLink;
+                });
+                links = links.concat(mappedRelationship);
+                newLinks = newLinks.concat(mappedRelationship);
+            };
+
+            // Get unique nodes and set node data
+            var uniqueNode = function getUniqueNode(nodeCollections, rowCollections) {
+                nodeCollections.forEach(function(n) {
+                    if (idIndex(nodes, n.id) == null) {
+                        var currNode = {
+                            id: parseInt(n.id),
+                            label: n.properties.name || n.properties.bank,
+                            title: n.labels[0],
+                            color: nodesColor(n.labels[0]),
+                            _data: dataObj(rowCollections)
+                        };
+                        nodes.push(currNode);
+                        newNodes.push(currNode);
+                        nodeIds.push(parseInt(n.id));
+                    }
+                });
+            };
+
+            // push graph data to its respective objects
+            res.forEach(function(row, rowIdx) {
+                uniqueNode(row.graph.nodes, row.row);
+                uniqueRelationship(row.graph.relationships);
+            });
+
+            // in case of need list of new data entered
+            if (getEnterSet) {
+                return {
+                    nodes: newNodes,
+                    edges: newLinks
+                };
+            }
+        }
+
+        function seggregateData(allResult) {
+            var graphData, rowData;
+
+            // Separate graph and row data
+            graphData = allResult.results.filter(function(result) {
+                return result.data.length && result.data[0].graph;
+            });
+
+            rowData = allResult.results.filter(function(result) {
+                return result.data.length && result.data[0].row;
+            });
+
+            return {
+                graphData: graphData,
+                rowData: rowData
+            }
+        }
+
+        var network;
+
+        function buildGraph(jsonData) {
+
+            // create a network
+            var container = document.getElementById('vis');
+
+            // provide the data in the vis format
+            var data = {
+                nodes: jsonData.nodes,
+                edges: jsonData.edges
+            };
+            var options = {
+                autoResize: true,
+                width: "100%",
+                height: "480px",
+                edges: {
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 1,
+                            type: 'arrow'
+                        }
+
+                    },
+                    font: {
+                        align: 'top',
+                        vadjust: -5
+                    },
+                    length: 200,
+                    smooth: {
+                        enabled: true,
+                        type: "vertical",
+                        roundness: 0
+                    },
+                    width: 3
+                },
+                nodes: {
+                    borderWidth: 2,
+                    font: {
+                        size: 20
+                    },
+                    shape: 'circle'
+                },
+                "physics": {
+                    enabled: false,
+                    "barnesHut": {
+                        "gravitationalConstant": -23740,
+                        "centralGravity": 0.15,
+                        "springLength": 145,
+                        "springConstant": 0.055,
+                        "damping": 0.72,
+                        "avoidOverlap": 0.08
+                    },
+                    "maxVelocity": 11,
+                    "minVelocity": 0.43
+                }
+            };
+
+            // initialize your network!
+            if (typeof(network) !== "undefined") {
+                network.destroy();
+            }
+
+            network = new vis.Network(container, data, options);
+            network.on("click", function(params) {
+                // TO DO : show properties of selected node
+                var nodeId = this.getNodeAt(params.pointer.DOM);
+                var nodeDetail = dataSetNodes.get(nodeId);
+                console.log(nodeDetail);
+            });
+
+            network.on("doubleClick", extendGraph);
+        }
+
+        function updateNetworkLabel() {
+            var nodes = dataSetNodes.get();
+            nodes.forEach(function(node) {
+                var currConnectedNodes = network.getConnectedNodes(node.id);
+                var totalConnection = node._data.noOfRel;
+                if ((totalConnection - currConnectedNodes.length) > 0) {
+                    node.label = node._data.nodeName + "\n" + "+" + (totalConnection - currConnectedNodes.length);
+                    dataSetNodes.update(node);
+                }
+            });
+        }
+
+        function showAllNodes() {
+            var resultStr = #server( % BI.Graph.BasicQueries.GetAllNodesandRelationships())#;
+            var data = convert(resultStr);
+            buildGraph(data);
+        }
+
+        function findShortestPath() {
+            var selectedNodes = nodeList();
+            if (selectedNodes.length != 2) {
+                alert("Please choose 2 nodes only");
+                return;
+            }
+
+            var resultStr = #server( % BI.Graph.BasicQueries.GetShortestPath(selectedNodes[0], selectedNodes[1]))#;
+            var data = convert(resultStr);
+            buildGraph(data);
+        }
+
+        function updateColoronShortestPath(pathEntities) {
+
+            var clickedNode = dataSetNodes.get(nodeID);
+            clickedNode.color = {
+                border: '#000000',
+                background: '#000000',
+                highlight: {
+                    border: '#2B7CE9',
+                    background: '#D2E5FF'
+                }
+            }
+            dataSetNodes.update(clickedNode);
+
+        }
+
+        function getDistinctNodeLabels() {
+            var result = JSON.parse(#server( % BI.Graph.BasicQueries.GetAllNodesLabel())#);
+
+            if (result.errors.length > 0) {
+                console.log(result.errors);
+                return;
+            }
+
+            var labels = result.results[0].data;
+            populateDropDown(labels, "#drpNodeType");
+        }
+
+        function getNodesbyType() {
+            var nodesVal = $("#drpNodeType").val();
+            if (nodesVal == "") {
+                return;
+            }
+
+            var result = JSON.parse(#server( % BI.Graph.BasicQueries.GetNodesbyLabelType(nodesVal, "name"))#);
+
+            if (result.errors.length > 0) {
+                console.log(result.errors);
+                return;
+            }
+
+            var nodes = result.results[0].data;
+            //populateDropDown(nodes, "#drpNodes");
+            return nodes;
+        }
+
+        function populateDropDown(array, elem) {
+            var clearOptions = function clearOptions(e) {
+                $(e).find("option").remove().end().append("<option value=''></option>");
+            };
+
+            clearOptions(elem);
+            array.forEach(function(item) {
+                var val = item.row[0];
+                $(elem).append($('<option>', {
+                    value: val,
+                    text: val
+                }));
+            });
+        }
+
+        var toArray = function toArray(obj) {
+            var array = [];
+            // iterate backwards ensuring that length is an UInt32
+            for (var i = obj.length >>> 0; i--;) {
+                array[i] = obj[i];
+            }
+            return array;
+        };
+
+        var currNodeList;
+
+        function getNodes() {
+            var nodeType = $("#drpNodeType").val();
+            if (nodeType == "") {
+                return;
+            }
+
+            var nodeList = getNodesbyType();
+
+            // Save nodeIds in external array
+            currNodeList = nodeList.map(function(obj) {
+                return parseInt(obj.row[1]); // obj.row[1] contains id of the node
+            });
+
+            var getSelected = function getSelected() {
+                var selectedArr = [];
+                var selDiv = document.getElementById("nodeSelected");
+                Array.prototype.forEach.call(selDiv.children, function(elem, elemIdx) {
+                    var batchId = parseInt(elem.id.split("||")[1]);
+                    selectedArr.push(batchId);
+                });
+                return selectedArr;
+            };
+
+            var td = document.getElementById("nodeList");
+
+            var clearHl = function clearHl(elem) {
+                var parentId = elem.parentNode.id;
+                var otherParent;
+                var remClass = function remClass(parent) {
+                    //var selectedElem = getElementsByClassName("selected", null, parent);
+                    var selectedElem = $(".selected");
+                    var arrayOfElem = toArray(selectedElem);
+                    arrayOfElem.forEach(function(obj, objIdx) {
+                        dehighlight(obj);
+                    });
+                };
+
+                //Qayyuum 03032016 - Remove existing highlighted element
+                remClass(elem.parentNode);
+
+                if (parentId === "nodeSelected") {
+                    otherParent = document.getElementById("nodeList");
+                    remClass(otherParent);
+                    btnDirection("&lt;");
+                } else if (parentId === "nodeList") {
+                    otherParent = document.getElementById("nodeSelected");
+                    remClass(otherParent);
+                    btnDirection("&gt;");
+                } else {
+                    // do nothing
+                }
+            };
+
+            var opt = function createSelection(o, order) {
+                var div = document.createElement("div");
+                div.innerHTML = o.name;
+                div.id = "nodeDiv||" + o.id;
+                div.order = order;
+                div.onclick = function() {
+                    var elem = div;
+                    return function() {
+                        clearHl(elem);
+                        hl(elem);
+                    };
+                }();
+                div.ondblclick = function() {
+                    var elem = div;
+                    return function() {
+                        swapCol(elem);
+                    };
+                }();
+                return div;
+            };
+
+            while (td.firstChild) {
+                td.removeChild(td.firstChild);
+            }
+
+            var selectedNodes = getSelected();
+
+            var convertObj = function(o) {
+                return {
+                    id: o.row[1],
+                    name: o.row[0]
+                };
+            };
+
+            nodeList.forEach(function(item, itemIdx) {
+                var row,
+                    currObj;
+                // Exclude items that have been selected previously
+                if (selectedNodes.indexOf(parseInt(item.row[1])) == -1) {
+                    currObj = convertObj(item);
+                    row = opt(currObj, itemIdx);
+                    td.appendChild(row);
+                }
+            });
+        }
+
+        var hl = function toggleHlight(elem) {
+            if (elem.className.match(/(?:^|\s)selected(?!\S)/g)) {
+                elem.className = elem.className.replace(/(?:^|\s)selected(?!\S)/g, "");
+            } else {
+                elem.className += " selected";
+            }
+        };
+
+        var dehighlight = function dehighlight(elem) {
+            if (elem.className.match(/(?:^|\s)selected(?!\S)/g)) {
+                elem.className = elem.className.replace(/(?:^|\s)selected(?!\S)/g, "");
+            }
+        }
+
+        var btnDirection = function btnDirection(direction) {
+            var btn = document.getElementById("btnMove");
+            btn.innerHTML = direction;
+        };
+
+        var btnDirectionAll = function btnDirectionAll(direction) {
+            var btn = document.getElementById("btnMoveAll");
+            btn.innerHTML = direction;
+        };
+
+        var swapCol = function swapCol(elem) {
+            var temp,
+                sel;
+            var parentClassId = elem.parentNode.id;
+            var contLen = function contLen(id) {
+                var child = document.getElementById(id).children;
+                return child.length;
+            };
+
+            dehighlight(elem);
+            temp = elem.parentNode.removeChild(elem);
+            if (parentClassId === "nodeSelected") {
+                sel = document.getElementById("nodeList");
+                // Add back to the list if the batch year is same
+                if (currNodeList.indexOf(parseInt(temp.id.split("||")[1])) != -1) {
+                    sel.appendChild(temp);
+                }
+                // Update button direction
+                if (contLen("nodeSelected") === 0) {
+                    btnDirection("&gt;");
+                    btnDirectionAll("&gt;&gt;");
+                }
+            } else if (parentClassId === "nodeList") {
+                sel = document.getElementById("nodeSelected");
+                sel.appendChild(temp);
+                if (contLen("nodeList") === 0) {
+                    btnDirection("&lt;");
+                    btnDirectionAll("&lt;&lt;");
+                }
+            } else {
+                // do nothing
+            }
+        };
+
+        function moveSelection(selectAll) {
+            var getDirection = function getDirection() {
+                var btn = document.getElementById("btnMove");
+                return btn.innerHTML;
+            };
+
+            var getHl = function getHl(parent) {
+                var selectedElem = $(".selected");
+                var arrayOfElem = toArray(selectedElem);
+                return arrayOfElem;
+            };
+
+            var moveSelected = function moveSelected(r) {
+                r.forEach(function(i, idx) {
+                    swapCol(i);
+                });
+            };
+
+            var getParent = function getParent(direction) {
+                if (direction === "&lt;") {
+                    return document.getElementById("nodeSelected");
+                } else if (direction === "&gt;") {
+                    return document.getElementById("nodeList");
+                } else {
+                    alert("Cannot found any");
+                }
+            };
+
+            var getSelected = function getSelected(selectAll) {
+                var direction = getDirection(),
+                    parent = getParent(direction);
+                var collection,
+                    child;
+
+                if (selectAll && selectAll == 1) {
+                    child = parent.children;
+                    collection = toArray(child);
+                } else {
+                    collection = getHl(parent);
+                }
+
+                moveSelected(collection);
+            }
+
+            getSelected(selectAll);
+        }
+
+        var nodeList = function getSelectedNodeList() {
+            var c = $("#nodeSelected");
+            if (c.children.length == 0) { // in case nothing is selected
+                c = $("#nodeList");
+            };
+
+            var selectedNodeIds = [];
+            c.children().each(function() {
+                var nodeId = $(this).attr("id").split("||")[1];
+                selectedNodeIds.push(nodeId);
+            });
+
+            return selectedNodeIds;
+        };
+
+        function showGraphbySelectedNodes() {
+            var hops = $("#txtHops").val();
+            var strNodeList = nodeList().join(",");
+            var resultStr = #server( % BI.Graph.BasicQueries.GetGraphByNodeCollections(strNodeList, hops))#;
+
+            var result = JSON.parse(resultStr);
+            if (result.errors.length > 0) {
+                console.log(result.errors);
+                return;
+            }
+
+            $("#resultBox").text(result);
+            var data = convert(resultStr);
+            buildGraph(data);
+        }
+
+        function extendGraph(params) {
+            // Get nodes to exclude
+            var getExcludeNode = function getExcludeNode(id) {
+                var itemToExclude = links.filter(function(item) {
+                    return item.from == id || item.to == id;
+                });
+                return itemToExclude;
+            };
+
+            var getExistingNode = function getExistingNode(excludeNode) {
+                var filteredNodes = nodes.filter(function(i) {
+                    return i.id != excludeNode;
+                });
+                return filteredNodes.map(function(i) {
+                    return i.id;
+                });
+            };
+
+            var excludeObj,
+                excludeIds,
+                results,
+                parsedData;
+
+            var node = this.getNodeAt(params.pointer.DOM);
+            var existingNodes = getExistingNode(node);
+
+            if (node != undefined) {
+                excludeObj = getExcludeNode(node);
+                excludeIds = excludeObj.map(function(obj) {
+                    return obj.from == node ?
+                        obj.to :
+                        obj.from;
+                });
+
+                results = JSON.parse(#server( % BI.Graph.BasicQueries.ExtendGraph(node, excludeIds.join(","), existingNodes.join(",")))#);
+                if (results.errors.length > 0) {
+                    console.log(results.errors);
+                    return;
+                }
+
+                parsedData = seggregateData(results);
+
+
+                // Generate graph
+                /*parsedData.graphData.forEach(function(graph){
+		var data = convertData(graph.data, null, 1);
+		dataSetNodes.update(data.nodes);
+		dataSetEdges.update(data.edges);
+	    
+	});
+	
+	// Add attributes to generated graph based on row data
+	parsedData.rowData.forEach(function(rows){
+		rows.data.forEach(function(row){
+			var connectedEdges;
+			var nodeId = row.row[0];
+			var edgesCnt = row.row[1];
+			
+			var node = dataSetNodes.get(nodeId);
+			if (node) {
+			  connectedEdges = network.getConnectedEdges(nodeId);
+			  if ((edgesCnt - connectedEdges.length) > 0) {
+				  node.label = node.label + "\n" + "+" + (edgesCnt - connectedEdges.length);
+				  dataSetNodes.update(node)
+			  }
+			}
+			
+		});
+	});
+    */
+            }
+        }
+    </script>
+
+    <!--CSS Definition Start-->
+    <link rel="stylesheet" href="webStyle.css" type="text/css">
+    <link rel="stylesheet" href="css/style.css" type="text/css">
+    <script language=cache runat=server>
+        d loadThemeCSS ^ % bi.SWr.WebThemeEdit
+    </script>
+    <!-- #include file = "general.csp" -->
+    <link rel="stylesheet" href="css/wordcloud.css" type="text/css">
+    <style type="text/css">
+        #vis {
+            width: 100%;
+            height: 480px;
+            border: 1px solid black;
+            display: inline-block;
+        }
+        
+        #log {
+            border: 1px solid black;
+            width: 200px;
+            height: 480px;
+            display: inline-block;
+        }
+        
+        #resultBox,
+        #resultConvert {
+            border: 1px solid black;
+            margin-bottom: 5px;
+        }
+        
+        .visWrapper {
+            width: 100%;
+            height: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+        
+        .button {
+            height: 20px;
+        }
+        
+        body {
+            overflow: auto;
+        }
+        
+        select {
+            width: 200px;
+        }
+        
+        #nodeBox {
+            width: 400px;
+            border: 1px solid #cccccc;
+            border-collapse: collapse;
+        }
+        
+        table#nodeBox td {
+            width: 45%;
+        }
+        
+        table#nodeBox td.butCol {
+            width: 10%;
+            border-top: none;
+            border-bottom: none;
+            vertical-align: middle;
+        }
+        
+        table#nodeBox td#nodeListCon,
+        table#nodeBox td#nodeSelectedCon {
+            height: 300px;
+            vertical-align: top;
+        }
+        
+        table#nodeBox {
+            border: 0;
+        }
+        
+        td.secTitle {
+            height: 26px;
+            border: 1px solid #cccccc;
+            vertical-align: middle;
+        }
+        
+        td#nodeListCon,
+        td#nodeSelectedCon {
+            border: 1px solid #cccccc;
+        }
+        
+        #nodeList,
+        #nodeSelected {
+            height: 100%;
+            overflow: auto;
+        }
+        
+        .selected {
+            background-color: #0080ff;
+            color: white;
+        }
+        
+        td#displayPane,
+        td#selectionPane {
+            border: 1px solid #cccccc;
+            padding: 5px;
+        }
+        
+        td#selectionPane {
+            width: 425px;
+        }
+        
+        td {
+            vertical-align: top;
+        }
+        
+        .tabFrm {
+            border: 0;
+        }
+    </style>
+</head>
+
+<body style="width:100%;height:100%;overflow:hidden">
+    <table id="mainTab" cellpadding="0" cellspacing="0" style="width:100%;height:100%;border-collapse:collapse;">
+        <tr style="height:31px;">
+            <td colspan="2">
+                <div class="divMnHdr top"><span>#($$$Text("Network Analysis"))#</span></div>
+            </td>
+        </tr>
+        <tr>
+            <td id="selectionPane">
+                <table cellpadding=0 cellspacing=0>
+                    <tr>
+                        <td>
+                            <div id="td1" class="tab" onClick="sTab('d1','d2');" onMouseOver=mover(this) onMouseOut=mout(this)>
+                                Selection
+                            </div>
+                        </td>
+                        <td>
+                            <div id="td2" class="tab" onClick="sTab('d2','d1');" onMouseOver=mover(this) onMouseOut=mout(this)>
+                                Custom Query
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                <div class="tabFrm" style="height:200px;width:100%">
+                    <div id="d1" class="tabDiv">
+                        <div style="padding-left:5px;">
+                            <div style="padding:5px;">
+                                <span>Node Type&nbsp;&nbsp;<select id="drpNodeType"><option value=""></option></select></span>
+                            </div>
+                            <span style="display:none;">Node<select id="drpNodes"><option value=""></option></select></span>
+                            <table id="nodeBox">
+                                <tr>
+                                    <td class="secTitle titleBar">Node List</td>
+                                    <td class="butCol"></td>
+                                    <td class="secTitle titleBar">Selected Nodes</td>
+                                </tr>
+                                <tr>
+                                    <td id="nodeListCon">
+                                        <div id="nodeList"></div>
+                                    </td>
+                                    <td class="butCol" align="center">
+                                        <button class="button" id="btnMove">&gt;</button>
+                                        <button class="button" id="btnMoveAll">&gt;&gt;</button>
+                                    </td>
+                                    <td id="nodeSelectedCon">
+                                        <div id="nodeSelected"></div>
+                                    </td>
+                                </tr>
+                            </table>
+                            <div style="padding:5px 10px 5px 5px;float:right;">
+                                <div>
+                                    <button class="button" onclick="showAllNodes()">Show All</button>
+                                    <button class="button" onclick="findShortestPath()">Shortest Path</button>
+                                    <button class="button" onclick="updateNetworkLabel()">Update Label</button>
+                                </div>
+                                <div>
+                                    <span>Find by <input type="text" id="txtHops" class="txtField" value=1> hops. <button class="button" onclick="showGraphbySelectedNodes()">Find</button></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="d2" class="tabDiv">
+                        <div style="width:100%;padding-top:5px">
+                            <textarea id="txtQry" rows="15" cols="65">MATCH (n) OPTIONAL MATCH (n)-[r]-() RETURN n, r</textarea>
+                            <div style="width:100%;padding-bottom:5px;">
+                                <button onclick="submitQry()" class="button">Submit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td id="displayPane">
+                <div class="visWrapper">
+                    <div class="vis" id="vis"></div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+
+
+    <div id="resultBox" style="display:none"></div>
+    <div id="resultConvert" style="display:none"></div>
+    <div id="log" style="display:none"></div>
+</body>
+
+<script type="text/javascript">
+    window.onload = function() {
+        getDistinctNodeLabels();
+        $("#drpNodeType").on("click", function() {
+            getNodesbyType();
+            getNodes();
+        });
+        $("#btnMove").on("click", function() {
+            moveSelection();
+        });
+        $("#btnMoveAll").on("click", function() {
+            moveSelection(1);
+        });
+
+        sTab('d1', 'd2');
+    };
+</script>
+
+</html>

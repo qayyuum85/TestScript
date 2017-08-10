@@ -1,339 +1,374 @@
 <!DOCTYPE HTML>
 <html>
+
 <head>
   <meta charset="UTF-8">
-<script type='text/javascript'>
-document.oncontextmenu = function () {
-  return false;
-};
-
-var obj = [{id:1,type:"dictionary",list:[{id:22,type:"item",parentId:1,list:[{id:70,parentId:22,type:"terms"},{id:71,parentId:22,type:"terms"}]},{id:23,parentId:1,type:"item"}]},
-          {id:2,type:"dictionary",list:[{id:24,parentId:2,type:"item"},{id:25,parentId:2,type:"item"}]}];
-/*var findObj = function findObj(obj, level, itemId){
-    obj.find(function(item){
-      if (typeof(item.list)!="undefined" && item.list.length>0){
-        findObj(item.list,level,itemId);
-      }
-      else {
-        return (level==item.type && item.id == itemId);
-      }
-  });
-};*/
-var dataModule = function(){
-  // dictionary = {id,name,parentId,type,list:[itemList]}
-  var dictionary=[], items=[], terms=[];
-  var newCtr = 1;
-
-  // find index in array
-  var idxArr = function findIdx (r, idToFind){
-    return r.findIndex(function(t){
-      return t.id == idToFind;
-    });
-  };
-
-  // break down all the items
-  var segregate = function segregate(objectList){
-    objectList.forEach(function(obj){
-      if (typeof obj.list != "undefined" && obj.list.length>0) {
-        segregate(obj.list);
-      }
-      if (obj.list) { delete obj.list; }
-      if (obj.type == "dictionary"){
-        dictionary.push(obj);
-      }
-      else if (obj.type == "item") {
-        items.push(obj);
-      }
-      else {
-        terms.push(obj);
-      }
-    });
-  };
-
-  // combine all item
-  var aggregate = function aggregate(){
-    var compiledItem = function(){
-      return items.map(function(item){
-        var itemId = item.id;
-        var termList = terms.filter(function(term){
-          return term.parentId == itemId;
-        });
-        item.list = termList;
-        return item;
-      });
+  <script type='text/javascript'>
+    document.oncontextmenu = function() {
+      return false;
     };
 
-    var compiledDict = function(cItem){
-      return dictionary.map(function(dict){
-        var dictId = dict.id;
-        var itemList = cItem.filter(function(item){
-          return item.parentId == dictId;
-        });
-        dict.list = itemList;
-        return dict;
+    var obj = [{
+        id: 1,
+        type: "dictionary",
+        list: [{
+          id: 22,
+          type: "item",
+          parentId: 1,
+          list: [{
+            id: 70,
+            parentId: 22,
+            type: "terms"
+          }, {
+            id: 71,
+            parentId: 22,
+            type: "terms"
+          }]
+        }, {
+          id: 23,
+          parentId: 1,
+          type: "item"
+        }]
+      },
+      {
+        id: 2,
+        type: "dictionary",
+        list: [{
+          id: 24,
+          parentId: 2,
+          type: "item"
+        }, {
+          id: 25,
+          parentId: 2,
+          type: "item"
+        }]
+      }
+    ];
+    /*var findObj = function findObj(obj, level, itemId){
+        obj.find(function(item){
+          if (typeof(item.list)!="undefined" && item.list.length>0){
+            findObj(item.list,level,itemId);
+          }
+          else {
+            return (level==item.type && item.id == itemId);
+          }
       });
-    };
+    };*/
+    var dataModule = function() {
+      // dictionary = {id,name,parentId,type,list:[itemList]}
+      var dictionary = [],
+        items = [],
+        terms = [];
+      var newCtr = 1;
 
-    var newItem = compiledItem();
-    var newDict = compiledDict(newItem);
-    return newDict;
-  };
+      // find index in array
+      var idxArr = function findIdx(r, idToFind) {
+        return r.findIndex(function(t) {
+          return t.id == idToFind;
+        });
+      };
 
-  // update record in selected array
-  var updateItem = function updateItem(type, name, id, parentId){
-    var update = function(array, id){
-      var ref = idxArr(array, id);
-      if (ref==-1) {
-          array.push(
-            {
+      // break down all the items
+      var segregate = function segregate(objectList) {
+        objectList.forEach(function(obj) {
+          if (typeof obj.list != "undefined" && obj.list.length > 0) {
+            segregate(obj.list);
+          }
+          if (obj.list) {
+            delete obj.list;
+          }
+          if (obj.type == "dictionary") {
+            dictionary.push(obj);
+          } else if (obj.type == "item") {
+            items.push(obj);
+          } else {
+            terms.push(obj);
+          }
+        });
+      };
+
+      // combine all item
+      var aggregate = function aggregate() {
+        var compiledItem = function() {
+          return items.map(function(item) {
+            var itemId = item.id;
+            var termList = terms.filter(function(term) {
+              return term.parentId == itemId;
+            });
+            item.list = termList;
+            return item;
+          });
+        };
+
+        var compiledDict = function(cItem) {
+          return dictionary.map(function(dict) {
+            var dictId = dict.id;
+            var itemList = cItem.filter(function(item) {
+              return item.parentId == dictId;
+            });
+            dict.list = itemList;
+            return dict;
+          });
+        };
+
+        var newItem = compiledItem();
+        var newDict = compiledDict(newItem);
+        return newDict;
+      };
+
+      // update record in selected array
+      var updateItem = function updateItem(type, name, id, parentId) {
+        var update = function(array, id) {
+          var ref = idxArr(array, id);
+          if (ref == -1) {
+            array.push({
               id: "new" + newCtr++,
               parentId: parentId,
               name: name,
               type: type
+            });
+          } else {
+            array[ref] = {
+              id: id,
+              parentId: parentId,
+              name: name,
+              type: type
             }
-          );
-      }
-      else {
-        array[ref] = {
-            id: id,
-            parentId: parentId,
-            name: name,
-            type: type
           }
-      }
-    };
-    if (type == "dictionary") {
-      update(dictionary, id);
-    }
-    else if (type == "item") {
-      update(items, id);
-    }
-    else {
-      update(terms, id);
-    }
-  };
-
-  // delete record in selected array
-  // delete record related to the parent too
-  var deleteItem = function deleteItem(type, id){
-    var delItem = function(array,id){
-      var ref = idxArr(array, id);
-      if (ref!=-1) {
-          array.splice(ref, 1);
-      }
-    };
-    if (type == "dictionary") {
-      delItem(dictionary, id);
-    }
-    else if (type == "item") {
-      delItem(items, id);
-    }
-    else {
-      delItem(terms, id);
-    }
-  };
-
-  // retrieve records
-  var getRecord = function getRecord(type, parentId){
-    if (type == "dictionary") {
-      return dictionary;
-    }
-    else if (type == "item") {
-      return items.filter(function (r) {
-        return r.parentId == parentId;
-      });
-    }
-    else {
-      return terms.filter(function (r) {
-        return r.parentId == parentId;
-      });
-    }
-  };
-
-  return {
-    loadList: segregate,
-    extractList: aggregate,
-    updateItem: updateItem,
-    deleteItem: deleteItem,
-    getRecord: getRecord
-  };
-};
-
-var data = dataModule();
-data.loadList(obj);
-
-function getData(){
-	var container = function createContainer(item, itemIdx){
-		var updateObj = function updateObject(listRef){
-			var getParent = function getParent(parentElemId,itemId){
-				var parent = document.getElementById(parentElemId);
-				var parentElem = Array.prototype.find.call(parent.children, function(elem){
-					return (elem.data_id==itemId);
-				});
-
-				return parentElem;
-			};
-
-			var getIndex = function getArrayIdx(r,idToFind){
-				var ctr = 0, len = r.length;
-				for (ctr; ctr<len; ctr++) {
-					if (r[ctr].data_id==idToFind){
-						return ctr;
-					}
-				}
-			};
-
-			// update reference to object
-			var listType = listRef.data_type;
-			var thisParent, itemIdx=0;
-			if (listType=="dictionary") { // dictionary
-				// remove li only
-				listRef.parentElement.removeChild(listRef);
-			}
-			else if (listType=="item") { // item
-				// update reference to dict
-				thisParent = getParent("dictList", listRef.data_parentId);
-				// delete child of item
-				if (thisParent) {
-					itemIdx = getIndex(thisParent.data_list, listRef.data_id);
-					thisParent.data_list.splice(itemIdx);
-				}
-				listRef.parentElement.removeChild(listRef);
-			}
-			else if (listType=="term") { // term
-				thisParent = getParent("termList", listRef.data_parentId);
-			}
-			else {
-				// do nothing
-			}
-
-		};
-
-		var labels = function createLabels(listElem, parentCont, value){
-			var elem, div = document.createElement("div");
-			if (parentCont.id == "termList") {
-				elem = document.createElement("input");
-				elem.type = "text";
-				elem.value = value;
-				elem.className = "txtField termsField";
-			}
-			else {
-				elem = document.createElement("span");
-				elem.innerHTML = value;
-			}
-
-			// Remove button for items
-			var remBtn = document.createElement("button");
-			remBtn.className = "button";
-			remBtn.innerHTML = "X";
-			remBtn.onclick = function(){
-				var thisLI = listElem;
-				var parentList = parentCont;
-				return function (){
-					updateObj(thisLI);
-					//parentList.removeChild(thisLI);
-				};
-			}();
-
-			div.appendChild(elem);
-			div.appendChild(remBtn);
-			return div;
-		};
-
-		var thisParent = this.parentId, thisElem = this.cElem;
-		var listContainer = document.getElementById(thisElem);
-		var li = document.createElement("li");
-
-		// Attaching data
-		li.data_list = item.list;
-		li.data_id = item.id;
-		li.data_name = item.name;
-		li.data_type = item.type;
-		li.data_parentId = thisParent;
-		li.onclick = function(){
-			var data = li.data_list;
-			var parentId = item.id;
-			return function(){
-				if (typeof(data)!="undefined" && data.length>0) {
-					var cElem = (data[0].type == "item") ? "itemList" : "termList";
-					var thisObj = {"cElem": cElem, "parentId": parentId};
-					data.forEach(createContainer, thisObj);
-				}
-			};
-		}();
-
-		var itemDiv = labels(li, listContainer, item.name);
-		li.appendChild(itemDiv);
-		listContainer.appendChild(li);
-	};
-
-	//var dictObj = $.parseJSON(#server(%BI.iKnow.iKnow.GetDictionaries())#);
-	var thisObj = {"cElem": "dictList", "parentId": null};
-	dictObj.forEach(container, thisObj);
-}
-
-function buildSingleItem(containerId, type, item){
-  // labels function definition
-  var labels = function createLabels(listElem, parentCont, value){
-    var elem, div = document.createElement("div");
-    if (parentCont.id == "termList") {
-      elem = document.createElement("input");
-      elem.type = "text";
-      elem.value = value;
-      elem.className = "txtField termsField";
-    }
-    else {
-      elem = document.createElement("span");
-      elem.innerHTML = value;
-    }
-
-    // Remove button for items
-    var remBtn = document.createElement("button");
-    remBtn.className = "button";
-    remBtn.innerHTML = "X";
-    remBtn.onclick = function() {alert('Removed!')};
-
-    div.appendChild(elem);
-    div.appendChild(remBtn);
-    return div;
-  };
-
-  var listContainer = document.getElementById(containerId);
-  var li = document.createElement("li");
-
-  // create items
-  li.data_id = item.id;
-  li.data_type = item.type;
-  li.onclick = function(){
-    if (containerId=='termList') { return null; }
-    else {
-      return function(){
-        var subType = (type=='dictionary') ? 'item' : 'terms';
-        var containerName = (type=='dictionary') ? 'itemList' : 'termList';
-        var parentId = item.id;
-        populateContainer(containerName, subType, parentId);
+        };
+        if (type == "dictionary") {
+          update(dictionary, id);
+        } else if (type == "item") {
+          update(items, id);
+        } else {
+          update(terms, id);
+        }
       };
+
+      // delete record in selected array
+      // delete record related to the parent too
+      var deleteItem = function deleteItem(type, id) {
+        var delItem = function(array, id) {
+          var ref = idxArr(array, id);
+          if (ref != -1) {
+            array.splice(ref, 1);
+          }
+        };
+        if (type == "dictionary") {
+          delItem(dictionary, id);
+        } else if (type == "item") {
+          delItem(items, id);
+        } else {
+          delItem(terms, id);
+        }
+      };
+
+      // retrieve records
+      var getRecord = function getRecord(type, parentId) {
+        if (type == "dictionary") {
+          return dictionary;
+        } else if (type == "item") {
+          return items.filter(function(r) {
+            return r.parentId == parentId;
+          });
+        } else {
+          return terms.filter(function(r) {
+            return r.parentId == parentId;
+          });
+        }
+      };
+
+      return {
+        loadList: segregate,
+        extractList: aggregate,
+        updateItem: updateItem,
+        deleteItem: deleteItem,
+        getRecord: getRecord
+      };
+    };
+
+    var data = dataModule();
+    data.loadList(obj);
+
+    function getData() {
+      var container = function createContainer(item, itemIdx) {
+        var updateObj = function updateObject(listRef) {
+          var getParent = function getParent(parentElemId, itemId) {
+            var parent = document.getElementById(parentElemId);
+            var parentElem = Array.prototype.find.call(parent.children, function(elem) {
+              return (elem.data_id == itemId);
+            });
+
+            return parentElem;
+          };
+
+          var getIndex = function getArrayIdx(r, idToFind) {
+            var ctr = 0,
+              len = r.length;
+            for (ctr; ctr < len; ctr++) {
+              if (r[ctr].data_id == idToFind) {
+                return ctr;
+              }
+            }
+          };
+
+          // update reference to object
+          var listType = listRef.data_type;
+          var thisParent, itemIdx = 0;
+          if (listType == "dictionary") { // dictionary
+            // remove li only
+            listRef.parentElement.removeChild(listRef);
+          } else if (listType == "item") { // item
+            // update reference to dict
+            thisParent = getParent("dictList", listRef.data_parentId);
+            // delete child of item
+            if (thisParent) {
+              itemIdx = getIndex(thisParent.data_list, listRef.data_id);
+              thisParent.data_list.splice(itemIdx);
+            }
+            listRef.parentElement.removeChild(listRef);
+          } else if (listType == "term") { // term
+            thisParent = getParent("termList", listRef.data_parentId);
+          } else {
+            // do nothing
+          }
+
+        };
+
+        var labels = function createLabels(listElem, parentCont, value) {
+          var elem, div = document.createElement("div");
+          if (parentCont.id == "termList") {
+            elem = document.createElement("input");
+            elem.type = "text";
+            elem.value = value;
+            elem.className = "txtField termsField";
+          } else {
+            elem = document.createElement("span");
+            elem.innerHTML = value;
+          }
+
+          // Remove button for items
+          var remBtn = document.createElement("button");
+          remBtn.className = "button";
+          remBtn.innerHTML = "X";
+          remBtn.onclick = function() {
+            var thisLI = listElem;
+            var parentList = parentCont;
+            return function() {
+              updateObj(thisLI);
+              //parentList.removeChild(thisLI);
+            };
+          }();
+
+          div.appendChild(elem);
+          div.appendChild(remBtn);
+          return div;
+        };
+
+        var thisParent = this.parentId,
+          thisElem = this.cElem;
+        var listContainer = document.getElementById(thisElem);
+        var li = document.createElement("li");
+
+        // Attaching data
+        li.data_list = item.list;
+        li.data_id = item.id;
+        li.data_name = item.name;
+        li.data_type = item.type;
+        li.data_parentId = thisParent;
+        li.onclick = function() {
+          var data = li.data_list;
+          var parentId = item.id;
+          return function() {
+            if (typeof(data) != "undefined" && data.length > 0) {
+              var cElem = (data[0].type == "item") ? "itemList" : "termList";
+              var thisObj = {
+                "cElem": cElem,
+                "parentId": parentId
+              };
+              data.forEach(createContainer, thisObj);
+            }
+          };
+        }();
+
+        var itemDiv = labels(li, listContainer, item.name);
+        li.appendChild(itemDiv);
+        listContainer.appendChild(li);
+      };
+
+      //var dictObj = $.parseJSON(#server(%BI.iKnow.iKnow.GetDictionaries())#);
+      var thisObj = {
+        "cElem": "dictList",
+        "parentId": null
+      };
+      dictObj.forEach(container, thisObj);
     }
-  }();
 
-  // create labels
-  var itemDiv = labels();
-  li.appendChild(itemDiv);
-  listContainer.appendChild(li);
-}
+    function buildSingleItem(containerId, type, item) {
+      // labels function definition
+      var labels = function createLabels(listElem, parentCont, value) {
+        var elem, div = document.createElement("div");
+        if (parentCont.id == "termList") {
+          elem = document.createElement("input");
+          elem.type = "text";
+          elem.value = value;
+          elem.className = "txtField termsField";
+        } else {
+          elem = document.createElement("span");
+          elem.innerHTML = value;
+        }
 
-function populateContainer(container, type, selectedId){
-  var list = data.getRecord(type, selectedId);
-  var containerList = ['dictList','itemList','termList'];
-  list.forEach(function(r){
-    buildSingleItem(container, type, r);
-  });
-}
-</script>
-<style media="screen">
+        // Remove button for items
+        var remBtn = document.createElement("button");
+        remBtn.className = "button";
+        remBtn.innerHTML = "X";
+        remBtn.onclick = function() {
+          alert('Removed!')
+        };
 
-</style>
+        div.appendChild(elem);
+        div.appendChild(remBtn);
+        return div;
+      };
+
+      var listContainer = document.getElementById(containerId);
+      var li = document.createElement("li");
+
+      // create items
+      li.data_id = item.id;
+      li.data_type = item.type;
+      li.onclick = function() {
+        if (containerId == 'termList') {
+          return null;
+        } else {
+          return function() {
+            var subType = (type == 'dictionary') ? 'item' : 'terms';
+            var containerName = (type == 'dictionary') ? 'itemList' : 'termList';
+            var parentId = item.id;
+            populateContainer(containerName, subType, parentId);
+          };
+        }
+      }();
+
+      // create labels
+      var itemDiv = labels();
+      li.appendChild(itemDiv);
+      listContainer.appendChild(li);
+    }
+
+    function populateContainer(container, type, selectedId) {
+      var list = data.getRecord(type, selectedId);
+      var containerList = ['dictList', 'itemList', 'termList'];
+      list.forEach(function(r) {
+        buildSingleItem(container, type, r);
+      });
+    }
+  </script>
+  <style media="screen">
+
+  </style>
 </head>
+
 <body>
   <div class="ctxtMenu">
     <div class="ctxtItem">
@@ -341,4 +376,5 @@ function populateContainer(container, type, selectedId){
     </div>
   </div>
 </body>
+
 </html>

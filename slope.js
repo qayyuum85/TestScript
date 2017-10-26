@@ -2,7 +2,7 @@
  Detecting whether a point is above or below a slope
  (aX,aY) -  One end of slope coordinate
  (bX,bY) -  Other end of slope coordinate
- (tx. tY) - Test point
+ (tx,tY) - Test point
 
  Return value
   1 - Above

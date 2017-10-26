@@ -61,14 +61,15 @@
             dataSetNodes,
             dataSetEdges;
 
-        function convert(stringJSON) {
+        function convert(stringJSON, resultIdx) {
 
+            var resultIdx = (resultIdx) ? resultIdx : 0;
             nodes = [],
                 links = [],
                 nodeIds = [];
 
             var res = JSON.parse(stringJSON);
-            convertData(res.results[0].data, res.results[0].columns);
+            convertData(res.results[resultIdx].data, res.results[resultIdx].columns, "");
             dataSetNodes = new vis.DataSet(nodes);
             dataSetEdges = new vis.DataSet(links);
 
@@ -104,13 +105,12 @@
                 var columnDesc = columnDesc;
                 return function(rowData) {
                     var obj = {};
-                    if (columnDesc != null) {
+                    if (columnDesc != null && rowData) {
                         rowData.forEach(function(row, rowIdx) {
                             obj[columnDesc[rowIdx]] = row;
                         });
-                        return obj;
                     }
-                    return null;
+                    return obj;
                 };
             }(columnDesc);
 
@@ -155,8 +155,16 @@
 
             // push graph data to its respective objects
             res.forEach(function(row, rowIdx) {
-                uniqueNode(row.graph.nodes, row.row);
-                uniqueRelationship(row.graph.relationships);
+                if (parsedType == "") {
+                    uniqueNode(row.graph.nodes, row.row);
+                    uniqueRelationship(row.graph.relationships);
+                } else if (parsedType == "node") {
+                    uniqueNode(row.graph.nodes, row.row);
+                } else if (parsedType == "edge") {
+                    uniqueRelationship(row.graph.relationships);
+                } else if (parsedType == "nodeData") {
+
+                }
             });
 
             // in case of need list of new data entered
@@ -255,10 +263,14 @@
                 // TO DO : show properties of selected node
                 var nodeId = this.getNodeAt(params.pointer.DOM);
                 var nodeDetail = dataSetNodes.get(nodeId);
-                console.log(nodeDetail);
+                var edgeId = this.getEdgeAt(params.pointer.DOM);
+                var edgeDetail = dataSetEdges.get(edgeId);
+                if (typeof(edgeId) != "undefined") console.log(edgeDetail);
+                if (typeof(nodeId) != "undefined") console.log(nodeDetail);
             });
 
             network.on("doubleClick", extendGraph);
+
         }
 
         function updateNetworkLabel() {
@@ -268,8 +280,10 @@
                 var totalConnection = node._data.noOfRel;
                 if ((totalConnection - currConnectedNodes.length) > 0) {
                     node.label = node._data.nodeName + "\n" + "+" + (totalConnection - currConnectedNodes.length);
-                    dataSetNodes.update(node);
+                } else {
+                    node.label = node._data.nodeName;
                 }
+                dataSetNodes.update(node);
             });
         }
 
@@ -279,16 +293,48 @@
             buildGraph(data);
         }
 
+        // two start points, 1-from empty canvas, 2-existing canvas
         function findShortestPath() {
+            var appendProperties = function(propList) {
+                var columns = propList.columns;
+                var data = propList.data;
+                data.forEach(function(rows, rowsIdx) {
+                    var node = dataSetNodes.get(rows.row[0]);
+                    rows.row.forEach(function(i, idx) {
+                        node._data[columns[idx]] = i;
+                    });
+                    dataSetNodes.update(node);
+                });
+            };
+
+            var data;
+            // two start points
+            // 1-empty canvas: draw as other normal graph
+            // 2-existing canvas: select 2 nodes on canvas/list then press button to show
+
+            // selection from table list
             var selectedNodes = nodeList();
             if (selectedNodes.length != 2) {
                 alert("Please choose 2 nodes only");
                 return;
             }
 
+            // TO DO - selection from graph
+
+
+            // Get data
+            // Have to append properties separately since there are 2 queries executed
+            // for shortest path
+            var results;
             var resultStr = #server( % BI.Graph.BasicQueries.GetShortestPath(selectedNodes[0], selectedNodes[1]))#;
-            var data = convert(resultStr);
+
+            data = convert(resultStr);
+            results = JSON.parse(resultStr);
+            appendProperties(results.results[1]);
             buildGraph(data);
+            updateNetworkLabel();
+
+
         }
 
         function updateColoronShortestPath(pathEntities) {
@@ -595,6 +641,7 @@
             $("#resultBox").text(result);
             var data = convert(resultStr);
             buildGraph(data);
+            updateNetworkLabel();
         }
 
         function extendGraph(params) {
@@ -618,7 +665,8 @@
             var excludeObj,
                 excludeIds,
                 results,
-                parsedData;
+                nodeData,
+                edgeData;
 
             var node = this.getNodeAt(params.pointer.DOM);
             var existingNodes = getExistingNode(node);
@@ -637,37 +685,31 @@
                     return;
                 }
 
-                parsedData = seggregateData(results);
+                // 1st pass to update node data only
+                nodeData = convertData(results.results[0].data, results.results[0].columns, "", 1) //results.results[0]
+                    // 2nd pass to update relationship only
+                edgeData = convertData(results.results[1].data, "", "edge", 1)
 
+                // Draw new nodes and edges
+                nodeData.nodes.forEach(function(n) {
+                    dataSetNodes.update(n);
+                });
+                nodeData.edges.forEach(function(n) {
+                    dataSetEdges.update(n);
+                });
 
-                // Generate graph
-                /*parsedData.graphData.forEach(function(graph){
-		var data = convertData(graph.data, null, 1);
-		dataSetNodes.update(data.nodes);
-		dataSetEdges.update(data.edges);
-	    
-	});
-	
-	// Add attributes to generated graph based on row data
-	parsedData.rowData.forEach(function(rows){
-		rows.data.forEach(function(row){
-			var connectedEdges;
-			var nodeId = row.row[0];
-			var edgesCnt = row.row[1];
-			
-			var node = dataSetNodes.get(nodeId);
-			if (node) {
-			  connectedEdges = network.getConnectedEdges(nodeId);
-			  if ((edgesCnt - connectedEdges.length) > 0) {
-				  node.label = node.label + "\n" + "+" + (edgesCnt - connectedEdges.length);
-				  dataSetNodes.update(node)
-			  }
-			}
-			
-		});
-	});
-    */
+                // Update existing nodes with edges
+                if (edgeData.edges.length > 0) {
+                    edgeData.edges.forEach(function(e) {
+                        dataSetEdges.update(e);
+                    });
+                }
             }
+            updateNetworkLabel();
+        }
+
+        function displaySelectedItemProperties() {
+
         }
     </script>
 
@@ -705,6 +747,7 @@
             height: 480px;
             margin-left: auto;
             margin-right: auto;
+            position: relative;
         }
         
         .link {
@@ -795,6 +838,17 @@
         .tabFrm {
             border: 0;
         }
+        
+        .visProp {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            border: 1px solid black;
+            width: 100px;
+            height: 100px;
+            z-index: 10;
+            background-color: white;
+        }
     </style>
 </head>
 
@@ -872,6 +926,7 @@
             <td id="displayPane">
                 <div class="visWrapper">
                     <div class="vis" id="vis"></div>
+                    <div class="visProp" id="visProp"></div>
                 </div>
             </td>
         </tr>

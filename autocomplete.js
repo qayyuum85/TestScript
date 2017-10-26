@@ -1,4 +1,26 @@
-/*Auto Complete Feature*/
+/*
+=====================
+Auto Complete Feature
+=====================
+configuration_object: {
+    textField: (string) id of the textfield
+    cacheResult: (boolean) save the result of search
+    showAllResult: (boolean) filter the result based on input
+    events: (object) list of events to bind with list
+    getEntity: (function) [optional] extra on server filter
+    getSuggestion: (function) server method to retrieve suggestion result
+ }
+
+How to use:
+1. Include this script into html
+2. Create configuration object
+3. Run init() in window.onload event. Example:
+        window.onload = function() {
+            var ac = autoComplete(configuration);
+            ac.init();
+        };
+*/
+
 var autoComplete = function(configObj) {
     // Initialization
     var selectionContainer, listContainer;
@@ -417,7 +439,7 @@ var autoComplete = function(configObj) {
                     if (list[i].className === "fSelect") {
                         if (dataOnly) {
                             for (var prop in list[i]) {
-                                returnObj[prop.split('_')[1]] = list[i].prop;
+                                returnObj[prop.split('_')[1]] = list[i][prop];
                             }
                             return returnObj;
                         }
@@ -438,7 +460,7 @@ var autoComplete = function(configObj) {
                 for (i; i < listLen; i++) {
                     if (list[i].data_fullText === textToMatch) {
                         for (var prop in list[i]) {
-                            returnObj[prop.split('_')[1]] = list[i].prop;
+                            returnObj[prop.split('_')[1]] = list[i][prop];
                         }
                         return returnObj;
                     }

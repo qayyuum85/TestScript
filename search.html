@@ -1,0 +1,1218 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta http-equiv="X-UA-Compatible" charset="UTF-8" content="IE=edge">
+    <script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+    <script type="text/javascript" src="js/tab.js"></script>
+    <script type="text/javascript" src="js/es5shims.js"></script>
+    <title>KM iKnow Search</title>
+    <script type="text/javascript">
+        /*! jQuery JSON plugin v2.5.1 | github.com/Krinkle/jquery-json */ ! function($) {
+            "use strict";
+            var escape = /["\\\x00-\x1f\x7f-\x9f]/g,
+                meta = {
+                    "\b": "\\b",
+                    "	": "\\t",
+                    "\n": "\\n",
+                    "\f": "\\f",
+                    "\r": "\\r",
+                    '"': '\\"',
+                    "\\": "\\\\"
+                },
+                hasOwn = Object.prototype.hasOwnProperty;
+            $.toJSON = "object" == typeof JSON && JSON.stringify ? JSON.stringify : function(a) {
+                if (null === a) return "null";
+                var b, c, d, e, f = $.type(a);
+                if ("undefined" === f) return void 0;
+                if ("number" === f || "boolean" === f) return String(a);
+                if ("string" === f) return $.quoteString(a);
+                if ("function" == typeof a.toJSON) return $.toJSON(a.toJSON());
+                if ("date" === f) {
+                    var g = a.getUTCMonth() + 1,
+                        h = a.getUTCDate(),
+                        i = a.getUTCFullYear(),
+                        j = a.getUTCHours(),
+                        k = a.getUTCMinutes(),
+                        l = a.getUTCSeconds(),
+                        m = a.getUTCMilliseconds();
+                    return 10 > g && (g = "0" + g), 10 > h && (h = "0" + h), 10 > j && (j = "0" + j), 10 > k && (k = "0" + k), 10 > l && (l = "0" + l), 100 > m && (m = "0" + m), 10 > m && (m = "0" + m), '"' + i + "-" + g + "-" + h + "T" + j + ":" + k + ":" + l + "." + m + 'Z"'
+                }
+                if (b = [], $.isArray(a)) {
+                    for (c = 0; c < a.length; c++) b.push($.toJSON(a[c]) || "null");
+                    return "[" + b.join(",") + "]"
+                }
+                if ("object" == typeof a) {
+                    for (c in a)
+                        if (hasOwn.call(a, c)) {
+                            if (f = typeof c, "number" === f) d = '"' + c + '"';
+                            else {
+                                if ("string" !== f) continue;
+                                d = $.quoteString(c)
+                            }
+                            f = typeof a[c], "function" !== f && "undefined" !== f && (e = $.toJSON(a[c]), b.push(d + ":" + e))
+                        }
+                    return "{" + b.join(",") + "}"
+                }
+            }, $.evalJSON = "object" == typeof JSON && JSON.parse ? JSON.parse : function(str) {
+                return eval("(" + str + ")")
+            }, $.secureEvalJSON = "object" == typeof JSON && JSON.parse ? JSON.parse : function(str) {
+                var filtered = str.replace(/\\["\\\/bfnrtu]/g, "@").replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, "]").replace(/(?:^|:|,)(?:\s*\[)+/g, "");
+                if (/^[\],:{}\s]*$/.test(filtered)) return eval("(" + str + ")");
+                throw new SyntaxError("Error parsing JSON, source is not valid.")
+            }, $.quoteString = function(a) {
+                return a.match(escape) ? '"' + a.replace(escape, function(a) {
+                    var b = meta[a];
+                    return "string" == typeof b ? b : (b = a.charCodeAt(), "\\u00" + Math.floor(b / 16).toString(16) + (b % 16).toString(16))
+                }) + '"' : '"' + a + '"'
+            }
+        }(jQuery);
+
+        var entity = {};
+        var setResHeight = function calcResConHeight() {
+            var sbox = document.getElementById("searchBox");
+            var sboxH = sbox.clientHeight;
+            var bodyH = window.innerHeight ||
+                document.documentElement.clientHeight ||
+                document.body.clientHeight;
+
+            var rbox = document.getElementById("resBox");
+            rbox.style.height = (bodyH - sboxH) + "px";
+        };
+
+        function search() {
+            var qry = document.getElementById("qryBox").value,
+                result;
+
+            if (qry === "") {
+                return;
+            } else {
+                //Search
+                var obj = $.parseJSON(#server( % BI.WebKnowledge.Search(qry, 1))#);
+                var rList = document.getElementById("resList");
+                var relList = document.getElementById("relList");
+                var anyList = document.getElementById("anyList");
+                clear(rList);
+                clear(relList);
+                clear(anyList);
+                delete entity.list;
+                var tab = document.getElementById("fT");
+                cTab(tab, 1);
+
+                rList.appendChild(buildResult(obj.result, buildItem));
+                var simList = document.getElementById("suggestListSim");
+                if (obj.similar != null && typeof obj.similar === "object") {
+                    clear(simList);
+                    simList.appendChild(buildResult(obj.similar, linkSuggest));
+                    document.getElementById("simWordList").style.display = "block";
+                }
+
+                entity.list = obj.related;
+                var relList = document.getElementById("suggestListRel");
+                if (obj.related != null && typeof obj.related === "object") {
+                    clear(relList);
+                    relList.appendChild(buildResult(obj.related, linkSuggest));
+                }
+
+                setResHeight();
+            }
+        }
+
+        function getRelated() {
+            if (entity.list === "" || entity.list == "undefined" || entity.list == null) {
+                return;
+            } else {
+                var relList = document.getElementById("relList");
+                if (relList.hasChildNodes()) {
+                    return;
+                }
+                var obj = $.parseJSON(#server( % BI.WebKnowledge.RelatedSearch(entity.list.join(",")))#);
+                clear(relList);
+
+                relList.appendChild(buildResult(obj.result, buildItem));
+            }
+        }
+
+        function buildResult(r, f) {
+            var oList = document.createElement("ol");
+
+            r.forEach(function(col, colIdx) {
+                var li = document.createElement("li");
+                li.className = "list";
+
+                if (f && typeof f === "function") {
+                    var inner = f(col, colIdx);
+                    if (inner) {
+                        li.appendChild(inner);
+                    }
+                } else {
+                    li.innerHTML = col;
+                }
+                oList.appendChild(li);
+            });
+            return oList;
+        }
+
+        function buildItem(o, idx) {
+            var container = document.createElement("div"),
+                pLink = document.createElement("a"),
+                summary = document.createElement("span"),
+                fLink = document.createElement("a");
+
+            var bg = (idx % 2 === 0) ? " even" : "";
+            container.className = "items" + bg;
+
+            pLink.target = "_blank";
+            fLink.target = "_blank";
+
+            if (o && typeof o === "object") {
+                summary.innerHTML = o.Summary;
+                if (o.Attachment) {
+                    //Link, Name, ThreadLink
+                    fLink.className = "boldLink";
+                    fLink.href = o.Attachment.Link;
+                    fLink.innerHTML = o.Attachment.Name;
+                    pLink.href = o.Attachment.ThreadLink;
+                    pLink.innerHTML = "View Document Post";
+                    return addChildren(container, [fLink, summary, pLink]);
+                } else if (o.Post) {
+                    //PostTitle, ThreadLink
+                    pLink.className = "boldLink"
+                    pLink.href = o.Post.ThreadLink;
+                    pLink.innerHTML = o.Post.PostTitle;
+                    return addChildren(container, [pLink, summary]);
+                } else {
+                    return null;
+                }
+            }
+        }
+
+        function linkSuggest(o) {
+            var span = document.createElement("span");
+            span.innerHTML = o;
+            span.className = "linkSuggest";
+            span.onclick = function(str) {
+                return function link() {
+                    document.getElementById("qryBox").value = str;
+                    search();
+                };
+            }(o);
+
+            return span;
+        }
+
+        function addChildren(c, e) { //e as array, c container element
+            e.forEach(function(i) {
+                c.appendChild(i);
+            });
+            return c;
+        }
+
+        function clear(o) {
+            while (o.firstChild) {
+                o.removeChild(o.firstChild);
+            }
+        }
+
+        /*Paging*/
+        function Navigate(maxCount, pageSize, listType) {
+            this.currPage = 1;
+            this.listType = listType;
+            this.pageSize = pageSize;
+            this.maxPage = function calcMaxPage() {
+                var page = Math.floor(maxCount / pageSize + 1);
+                return page;
+            }();
+        }
+
+        Navigate.prototype.setMax = function(m) {
+            this.maxPage = (m == 0) ? 1 : m;
+        };
+
+        Navigate.prototype.setPageSize = function(n) {
+            this.pageSize = n;
+        };
+
+        Navigate.prototype.getCurr = function() {
+            return this.currPage;
+        };
+
+        Navigate.prototype.next = function(f) {
+            this.currPage = (this.currPage === this.maxPage) ? this.maxPage : this.currPage + 1;
+            if (f && typeof f === "function") {
+                f.call(this);
+            }
+        };
+
+        Navigate.prototype.prev = function(f) {
+            this.currPage = (this.currPage === 1) ? 1 : this.currPage - 1;
+            if (f && typeof f === "function") {
+                f.call(this);
+            }
+        };
+
+        Navigate.prototype.first = function(f) {
+            this.currPage = 1;
+            if (f && typeof f === "function") {
+                f.call(this);
+            }
+        };
+
+        Navigate.prototype.last = function(f) {
+            this.currPage = this.maxPage;
+            if (f && typeof f === "function") {
+                f.call(this);
+            }
+        };
+
+        Navigate.prototype.createNavi = function(loc, callback) {
+            var folder = "work/mygrant/custom/img/arrows/64x64/";
+            var imgArray = [{
+                    link: "end_left64.png",
+                    f: "first"
+                }, {
+                    link: "left64.png",
+                    f: "prev"
+                },
+                "", {
+                    link: "right64.png",
+                    f: "next"
+                }, {
+                    link: "end_right64.png",
+                    f: "last"
+                }
+            ];
+
+            var elem = document.getElementById(loc);
+            this.locId = loc;
+            var parent = document.createElement("div");
+
+            for (var i = 0; i < 5; i++) {
+                if (i === 2) {
+                    var txtbox = document.createElement("div");
+                    txtbox.innerHTML = "Page " + this.currPage + " of " + this.maxPage;
+                    txtbox.className = "pageNum";
+                    this.showElem = txtbox;
+                    parent.appendChild(txtbox);
+                } else {
+                    var that = this;
+                    var img = document.createElement("img");
+                    img.src = folder + imgArray[i].link;
+                    img.width = 20;
+                    img.height = 20;
+                    img.className = "paging";
+
+                    img.onclick = function(ctr) {
+                        return function() {
+                            that[imgArray[ctr].f](callback);
+                            that.showElem.innerHTML = "Page " + that.currPage + " of " + that.maxPage;
+                        };
+                    }(i);
+                    parent.appendChild(img);
+                }
+            }
+            elem.appendChild(parent);
+        };
+
+        function cTab(obj, idx) {
+            var resList = document.getElementById("resList"),
+                relList = document.getElementById("relList"),
+                anyList = document.getElementById("anyList"),
+                tdList = obj.parentNode.children,
+                simWordList = document.getElementById("simWordList"),
+                relWordList = document.getElementById("relWordList");
+
+            if (idx === 1) {
+                if (resList.style.display === "block") {
+                    return;
+                } else {
+                    resList.style.display = "block";
+                    simWordList.style.display = "block";
+                    relWordList.style.display = "none";
+                    relList.style.display = "none";
+                    anyList.style.display = "none";
+                    changeCls(tdList, idx);
+                }
+            } else if (idx === 2) {
+                if (relList.style.display === "block") {
+                    return;
+                } else {
+                    resList.style.display = "none";
+                    simWordList.style.display = "none";
+                    relList.style.display = "block";
+                    anyList.style.display = "none";
+                    getRelated();
+                    relWordList.style.display = "block";
+                    changeCls(tdList, idx);
+                }
+            } else if (idx === 3) {
+                if (anyList.style.display === "block") {
+                    return;
+                } else {
+                    resList.style.display = "none";
+                    relList.style.display = "none";
+                    simWordList.style.display = "none";
+                    relWordList.style.display = "none";
+                    anyList.style.display = "block";
+                    changeCls(tdList, idx);
+                }
+            } else {
+                return; //Nothing here, move along
+            }
+        }
+
+        function changeCls(array, idx) {
+            Array.prototype.forEach.call(array, function(item, itemIdx) {
+                if (itemIdx == (idx - 1)) {
+                    item.className = "selected";
+                } else {
+                    item.className = "nonselect";
+                }
+            });
+        }
+
+        // Added autocomplete feature
+        function autocompleteText(event) {
+            return;
+            var event = event || window.event;
+            var Array = ["abdullah", "aadfsdf", "niazi", "abdrty"]; // replace this with server call
+            var array2 = Array.map(function(n, i) {
+                return n.toLowerCase();
+            });
+            var searchBox = document.getElementById("qryBox");
+            var autoCompleteBox = document.getElementById("autocomplete");
+            var value = searchBox.value;
+            var lowerCaseVal, str_after, new_str;
+            if (value == "") {
+                autoCompleteBox.value = "";
+                return;
+            } else {
+                lowerCaseVal = value.toLowerCase();
+                autoCompleteBox.value = lowerCaseVal;
+                for (i = 0; i < array2.length; i++) {
+                    if (array2[i].lastIndexOf(lowerCaseVal, 0) === 0) {
+                        if (event.keyCode == 39) {
+                            searchBox.value = array2[i];
+                        }
+                        str_after = array2[i].substr(lowerCaseVal.length, array2[i].length);
+                        new_str = value + str_after;
+                        autoCompleteBox.value = new_str;
+                        return;
+                    }
+                }
+            }
+        }
+
+        /*Auto Complete Feature*/
+        var timeoutId = 0;
+        //var latestData;
+        function showSelection(elem) {
+            clearTimeout(timeoutId);
+            var entityList, objToAppend;
+            var UP = 38,
+                DOWN = 40,
+                ENTER = 13,
+                BACKSPACE = 8,
+                DELETE = 46;
+            var event = event || window.event;
+
+            // Timeout will only be triggered if other than these 3 keys are pressed
+            var pressedKey = getKey(event);
+            if (pressedKey == UP || pressedKey == DOWN || pressedKey == ENTER) {
+                return;
+            } else {
+                if (pressedKey == DELETE || pressedKey == BACKSPACE) {
+                    //console.log("DELETE DETECTED!");
+                    if (elem.value == "") {
+                        elem.data_selectedData = null;
+                        return;
+                    }
+                    // now go find new entity
+                    if (elem.data_selectedData && elem.data_selectedData.connectedIds) {
+                        entityList = #server( % BI.iKnow.iKnow.GetSelectedIds(elem.value, elem.data_selectedData.connectedIds))#;
+                        elem.data_selectedData.connectedIds = entityList;
+                        //latestData = elem.data_selectedData;
+                        //console.log(latestData);
+                    }
+                } else { // type forward
+                    appendManuallySelectedData(elem);
+                }
+                timeoutId = setTimeout(function() {
+                    genDropList(elem);
+                }, 500);
+            }
+        }
+
+        // in case manual entered query equals to result query
+        function appendManuallySelectedData(elem) {
+            var data = entityIds.getAll();
+            var txt = elem.value;
+            var matchPattern = function(item) {
+                var patt = new RegExp("^" + txt + "\s?$", "i");
+                return patt.test(item.fullText);
+            };
+            var foundData = data.find(matchPattern);
+            elem.data_selectedData = typeof(foundData) == "undefined" ? null : foundData;
+        }
+
+
+        // item structure { id,value,type,fullText }
+        var entityIds = function() {
+            var idList = [];
+
+            var getFullObj = function() {
+                return idList;
+            };
+
+            var getIds = function() {
+                return idList.map(function(i) {
+                    return i.id;
+                });
+            };
+
+            var addId = function(itemToAdd) {
+                var idx = ifExist(itemToAdd.value);
+                if (idx == -1) {
+                    idList.push(itemToAdd);
+                }
+            };
+
+            var removeId = function(itemToRemove) {
+                var idx = ifExist(itemToRemove);
+                if (idx != -1) {
+                    idList.splice(idx, 1);
+                }
+            };
+
+            var ifExist = function(a) {
+                var condition = function(b) {
+                    var strToFind = new RegExp(b, 'i');
+                    return function(item) {
+                        return strToFind.test(item.value);
+                    };
+                }(a);
+
+                return idList.findIndex(condition);
+            };
+
+            var resetNAdd = function(array) {
+                idList = [];
+                idList = array;
+            };
+
+            var removeAll = function() {
+                idList = [];
+            };
+
+
+            return {
+                getAll: getFullObj,
+                getIds: getIds,
+                add: addId,
+                remove: removeId,
+                setAll: resetNAdd,
+                removeAll: removeAll
+            };
+        }();
+
+        function buildList(txtRef, val) {
+            // Remove all children
+            var el = document.getElementById("selList");
+            while (el.firstChild) {
+                el.removeChild(el.firstChild);
+            }
+
+            var divList = document.getElementById("overSel");
+
+            var selectedId = function getSelectedEntity(e) {
+                if (e.data_selectedData && e.data_selectedData.connectedIds) {
+                    return e.data_selectedData.connectedIds;
+                }
+                return "";
+            }(txtRef);
+
+            // for clearing selected highlight in list
+            var clearfSelect = function() {
+                var rowArray = document.getElementById("selList").children;
+                Array.prototype.forEach.call(rowArray, function(row, rowIdx) {
+                    row.className = "";
+                });
+            };
+
+            var getSingleEntity = function(a) {
+                if (a.type === "ent") {
+                    return true;
+                }
+                return false;
+            };
+
+            var filterText = function filterText(data, f) {
+                var txt = document.getElementById("qryBox").value;
+                var matchPattern = function(item) {
+                    var patt = new RegExp("^" + txt + "\s?", "i");
+                    if (f && typeof(f) == "function") {
+                        return f(item);
+                    } else {
+                        return patt.test(item.fullText);
+                    }
+                };
+                return data.filter(matchPattern);
+            };
+
+            // Get data from server
+            var strData = #server( % BI.iKnow.iKnow.GetSuggestionTerm(val, selectedId))#;
+            var data = $.parseJSON(strData);
+
+            // to cache previous result if no entities found
+            if (data.length == 0) {
+                // only filter based on entered input
+                data = filterText(entityIds.getAll());
+            } else {
+                entityIds.setAll(data);
+            }
+
+            /*Build list*/
+            if (data && data.length > 0) {
+                data = filterText(data);
+                data.forEach(function(col) {
+                    var li = document.createElement("li");
+                    li.innerHTML = col.fullText;
+
+                    // Setting data to element
+                    li.data_text = col.value;
+                    li.data_id = col.id;
+                    li.data_type = col.type;
+                    li.data_fullText = col.fullText;
+                    li.data_connectedIds = col.connectedIds;
+
+                    // For appending fSelect class onmouseover
+                    li.onmouseover = function() {
+                        var thisLi = li;
+                        clearfSelect();
+                        thisLi.className = "fSelect";
+                    };
+
+                    li.onclick = function(data, searchElem) {
+                        var data = data,
+                            searchElem = searchElem;
+                        return function() {
+                            if (searchElem) {
+                                // Replace with search
+                                searchElem.value = data.fullText;
+                                divList.style.display = "none";
+                                /*searchElem.focus();
+                        
+                                // TODO - Execute search
+                                */
+
+                            }
+                        };
+                    }(col, txtRef);
+
+                    el.appendChild(li);
+                });
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+
+        function genDropList(elem) {
+            var selDiv = document.getElementById("overSel");
+            var show = buildList(elem, elem.value);
+            if (show) {
+                resizeOverlay(elem);
+            } else {
+                selDiv.style.display = "none";
+            }
+        }
+
+
+        function resizeOverlay(elem) {
+            var selDiv = document.getElementById("overSel");
+            var obj = elem.getBoundingClientRect();
+
+            selDiv.style.width = (obj.right - obj.left) + "px";
+            //selDiv.style.width = (obj.right - obj.left - 2) + "px"; //Minus 2 to fit with the textbox
+            selDiv.style.left = (obj.left) + "px";
+            selDiv.style.display = "block";
+
+            //document.getElementById("selList").firstChild.className = "fSelect";
+            setListPos(elem);
+        }
+
+        function setListPos(elem) {
+            // Adjust the position of list according to page height
+            var overlay = document.getElementById("overSel");
+
+            // Get max height of the page
+            var bodyHeight = function getBodyHeight() {
+                var body = document.body,
+                    html = document.documentElement;
+                var height = Math.max(body.scrollHeight, body.offsetHeight,
+                    html.clientHeight, html.scrollHeight, html.offsetHeight);
+                // return height;
+                return body.offsetHeight;
+            }
+
+            // Calculate list height
+            var listH = function calcListH() {
+                var list = document.getElementById("selList");
+                var numOfChild = (list.children) ? list.children.length : 0;
+
+                // Get an element's height in the list
+                var childH = function getChildHeight() {
+                    var fChild = list.firstChild;
+                    return fChild.offsetHeight;
+                };
+
+                return {
+                    "childH": childH(),
+                    "number": numOfChild,
+                    "totalH": numOfChild * childH()
+                }
+            };
+
+            // Check remaining height under element
+            var elemProp = elem.getBoundingClientRect();
+            var pageH = bodyHeight();
+            var remainingB = pageH - elemProp.bottom;
+
+            // Add another 2px to include padding & border
+            var elemTop = remainingB + (elemProp.bottom - elemProp.top) + 2;
+
+            // If less than move up, but up to specific height only, then overflow
+            var listDetail = listH();
+            var listHeight = listDetail.totalH + 2;
+
+            // Will push the list down if list height is at least 6 child elements
+            if (remainingB >= listDetail.childH * 6) {
+                // Subtract 2 because of border & padding
+                overlay.style.top = (elemProp.bottom - 2) + "px";
+                overlay.style.height = (listHeight > remainingB) ? remainingB + "px" : listHeight + "px";
+                //overlay.style.overflow = "auto";
+            }
+            // If cannot fit more than 6 children, then push up
+            else if (listHeight > remainingB) {
+                overlay.style.top = "";
+                overlay.style.bottom = elemTop + "px";
+                if (listHeight > elemProp.top) {
+                    overlay.style.height = elemProp.top + "px";
+                    //overlay.style.overflow = "hidden";
+                } else {
+                    // If less than remaining top height, 
+                    // then list should have relative size to its content
+                    overlay.style.height = listHeight + "px";
+                    //overlay.style.overflow = "hidden";
+                }
+
+            }
+            // Default behaviour
+            else {
+                // Subtract 2 because of border & padding
+                overlay.style.top = (elemProp.bottom - 2) + "px";
+                overlay.style.height = listHeight + "px";
+                //overlay.style.overflow = "hidden";
+            }
+        }
+
+        function hlChar(word, selChar) {
+            if (!selChar) {
+                return word;
+            } else {
+                var regx = new RegExp(selChar, 'gi');
+                return word.replace(regx, function(str) {
+                    return "<span class='hl'>" + str + "</span>";
+                });
+            }
+        }
+
+        function checkStyle(element) {
+            return (element.currentStyle) ? element.currentStyle : getComputedStyle(element, null);
+        }
+
+        /*forEach Shim*/
+        if (!Array.prototype.forEach) {
+            Array.prototype.forEach = function(callback, thisArg) {
+                var T, k;
+                if (this == null) {
+                    throw new TypeError(' this is null or not defined');
+                }
+                var O = Object(this);
+                var len = O.length >>> 0;
+                if (typeof callback !== "function") {
+                    throw new TypeError(callback + ' is not a function');
+                }
+                if (arguments.length > 1) {
+                    T = thisArg;
+                }
+                k = 0;
+                while (k < len) {
+                    var kValue;
+                    if (k in O) {
+
+                        kValue = O[k];
+                        callback.call(T, kValue, k, O);
+                    }
+                    k++;
+                }
+            };
+        }
+
+        /*isArray Shim*/
+        if (!Array.isArray) {
+            Array.isArray = function(arg) {
+                return Object.prototype.toString.call(arg) === '[object Array]';
+            };
+        }
+    </script>
+
+    <!--CSS Definition Start-->
+    <link rel="stylesheet" href="webStyle.css" type="text/css">
+    <link rel="stylesheet" href="css/style.css" type="text/css">
+    <script language=cache runat=server>
+        d loadThemeCSS ^ % bi.SWr.WebThemeEdit
+    </script>
+    <!-- #include file = "general.csp" -->
+    <style type="text/css">
+        html,
+        body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        div.mainCon {
+            width: 80%;
+            height: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        div#resCon {
+            width: 70%;
+            height: 100%;
+            display: inline-block;
+            overflow: auto;
+        }
+        
+        div#suggestCon {
+            width: 30%;
+            float: right;
+            padding-left: 40px;
+        }
+        
+        ol li {
+            list-style: outside none none;
+        }
+        
+        ol,
+        li {
+            border: 0px none;
+            margin: 0px;
+            padding: 0px;
+        }
+        
+        div.items {
+            border-bottom: 1px solid #eeeeee;
+            padding-bottom: 15px;
+            padding-right: 15px;
+        }
+        
+        div.items * {
+            display: block;
+            text-align: justify;
+        }
+        /*a { text-decoration:none; }*/
+        
+        a.boldLink {
+            font-weight: bold;
+            text-decoration: none;
+        }
+        
+        #qryBox {
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            z-index: 11;
+            background: transparent;
+            border: 1px solid #CCCCCC;
+            height: 30px;
+            padding: 5px;
+            width: 500px;
+            font-size: medium;
+        }
+        
+        div.even {
+            background-color: rgb(252, 252, 252);
+        }
+        
+        span.hl {
+            /*font-weight:bold;*/
+            display: inline;
+            background-color: #dddddd;
+        }
+        
+        .linkSuggest {
+            cursor: pointer;
+        }
+        
+        div#searchBox {
+            width: 100%;
+            height: 100px;
+            padding-top: 10px;
+        }
+        
+        div.option span {
+            font-weight: bold;
+        }
+        
+        div.option {
+            padding-bottom: 5px;
+            margin-right: 10px;
+            position: absolute;
+            width: 30%;
+            /*display:none;*/
+        }
+        
+        table.opt2 td {
+            font-size: 14px;
+        }
+        
+        td.selected {
+            border-bottom: 2px solid blue;
+        }
+        
+        td.nonselect {
+            border-bottom: 2px solid transparent;
+        }
+        
+        div {
+            position: relative;
+        }
+        
+        #autocomplete {
+            position: absolute;
+            top: 0px;
+            left: 1px;
+            background: transparent;
+            z-index: 10;
+            border: 0px;
+            height: 30px;
+            padding: 5px;
+            width: 500px;
+            font-size: medium;
+        }
+        
+        .noXButton::-ms-clear {
+            width: 0;
+            height: 0;
+        }
+        
+        div#overSel {
+            display: none;
+            position: absolute;
+            left: 0px;
+            z-index: 10;
+            background-color: white;
+            margin-left: 0px;
+            overflow: hidden;
+            border: solid 1px #dddddd;
+        }
+        
+        div#overSel ul {
+            list-style-type: none;
+            padding-left: 0px;
+            margin-left: 0px;
+            margin-bottom: 0px;
+            margin-top: 2px;
+            width: 100%;
+            height: 100%;
+            /*overflow: auto;*/
+        }
+        
+        div#overSel ul li {
+            cursor: pointer;
+            padding: 4px 4px 4px 4px;
+            font-size: medium;
+        }
+        
+        .fSelect {
+            background-color: #F2F2F2;
+            color: #000;
+        }
+    </style>
+</head>
+
+<body onresize="setResHeight()">
+    <div class="mainCon">
+        <div id="searchBox" class="search">
+            <div class="qry">
+                <table>
+                    <tr>
+                        <td>
+                            <div style="width:500px;height:30px;">
+                                <input type="text" id="qryBox" class="noXButton" onkeyup="showSelection(this);" />
+                                <!--input id="autocomplete" type="text" disabled="disabled" /-->
+                            </div>
+                        </td>
+                        <td>
+                            <div style="width:30px;height:30px;">
+                                <img style="position:absolute;" src="img/magni.gif" width="30" height="30" onclick="search()" />
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="option">
+                <table class="opt2" style="height:40px" cellspacing=10>
+                    <tr align="center">
+                        <td id="fT" class="selected" onclick="cTab(this,1)"><span style="text-align:center">Result</span></td>
+                        <td class="nonselected" onclick="cTab(this,2)"><span style="text-align:center">Related</span></td>
+                        <td class="nonselected" onclick="cTab(this,3)"><span style="text-align:center">Analysis</span></td>
+                    </tr>
+                </table>
+                <!--div class="aaa"><span>Result</span></div>
+                <div><span>Related</span></div>
+                <div><span>Analysis</span></div-->
+            </div>
+        </div>
+
+        <div id="resBox">
+            <div id="resCon">
+                <div id="resList" style="display:none"></div>
+                <div id="relList" style="display:none"></div>
+                <div id="anyList" style="display:none"></div>
+            </div>
+            <div id="suggestCon">
+                <div id="simWordList" style="display:none">
+                    <div style="margin-bottom:5px;"><b>Similar Search</b></div>
+                    <div id="suggestListSim"></div>
+                </div>
+                <div id="relWordList" style="display:none">
+                    <div style="margin-bottom:5px;"><b>Related Search</b></div>
+                    <div id="suggestListRel"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="overSel">
+        <ul id="selList">
+            <li>a</li>
+            <li>b</li>
+            <li>c</li>
+            <li>d</li>
+        </ul>
+    </div>
+
+</body>
+<script type="text/javascript">
+    window.onload = function() {
+        isIE();
+    };
+
+    function isIE() {
+        // Internet Explorer 6-11
+        var isIE = /*@cc_on!@*/ false || !!document.documentMode;
+        if (isIE) {
+            var autocomplete = document.getElementById("autocomplete");
+            autocomplete.style.top = "1px";
+        }
+    }
+
+    var getKey = function(e) {
+        if (window.event) {
+            return e.keyCode;
+        } // IE
+        else if (e.which) {
+            return e.which;
+        } // Netscape/Firefox/Opera
+    };
+
+    /*Event Listener*/
+    function addEvent(evnt, elem, func) {
+        if (elem.addEventListener) // W3C DOM
+            elem.addEventListener(evnt, func, false);
+        else if (elem.attachEvent) { // IE DOM
+            elem.attachEvent("on" + evnt, func);
+        } else { // No much to do
+            elem["on" + evnt] = func;
+        }
+    }
+
+    function toggleOverlay(event) {
+        event = event || window.event;
+        var elemId = event.srcElement.id;
+        var overlay = document.getElementById("overSel");
+        var style = checkStyle(overlay);
+        if (style.display === "block" && elemId !== "txtCity") {
+            overlay.style.display = "none";
+        }
+    }
+
+    // click to initiate search
+
+    // 4/4/2016 Qayyuum - Added Up, Down and Enter event for dropdown menu
+    function moveUpandDown(event) {
+        event = event || window.event;
+        var UP = 38,
+            DOWN = 40,
+            ENTER = 13,
+            BACKSPACE = 8,
+            DELETE = 46;
+        var overlay = document.getElementById("overSel");
+
+        // Find highlighted option 
+        var getSelected = function getHL(dataOnly) {
+            var i = 0;
+            var list = document.getElementById("selList").childNodes;
+            var listLen = list.length;
+
+            if (listLen !== 0) {
+                for (i; i < listLen; i++) {
+                    if (list[i].className === "fSelect") {
+                        if (dataOnly) {
+                            return {
+                                id: list[i].data_id,
+                                value: list[i].data_text,
+                                type: list[i].data_type,
+                                fullText: list[i].data_fullText,
+                                connectedIds: list[i].data_connectedIds
+                            };
+                        }
+                        return list[i];
+                    }
+                }
+            }
+            return null;
+        };
+
+        // Find highlighted option 
+        var getEqualsText = function getEqualsText(textToMatch) {
+            var i = 0;
+            var list = document.getElementById("selList").childNodes;
+            var listLen = list.length;
+
+            if (listLen !== 0) {
+                for (i; i < listLen; i++) {
+                    if (list[i].data_fullText === textToMatch) {
+                        return {
+                            id: list[i].data_id,
+                            value: list[i].data_text,
+                            type: list[i].data_type,
+                            fullText: list[i].data_fullText,
+                            connectedIds: list[i].data_connectedIds
+                        };
+                    }
+                }
+            }
+            return null;
+        };
+
+
+        var setFirst = function setFirstinList() {
+            var fChild = document.getElementById("selList").firstChild;
+            fChild.className = "fSelect";
+        };
+
+        // Check if scrollIntoView valid
+        var scrollViewState = function getScrollViewState(elem) {
+            var overlayProp = overlay.getBoundingClientRect(),
+                elemProp = elem.getBoundingClientRect();
+
+            if (elemProp.top < overlayProp.top) {
+                return true;
+            } else if (elemProp.bottom > overlayProp.bottom) {
+                return false;
+            } else {
+                return null;
+            }
+        };
+
+        // Switch highlight according to key pressed
+        var move = function moveHL(elem, direction, txtElem) {
+            var sibling;
+            var setHL = function setHL() {
+                var state = scrollViewState(sibling);
+                sibling.className = "fSelect";
+                elem.className = "";
+                state = null;
+                if (state != null) {
+                    sibling.scrollIntoView(state);
+                }
+            };
+            if (direction === "up") {
+                sibling = elem.previousSibling;
+                if (sibling) {
+                    setHL();
+                }
+            } else if (direction === "down") {
+                sibling = elem.nextSibling;
+                if (sibling) {
+                    setHL();
+                }
+            } else {
+                // do nothing
+            }
+        };
+
+        var setText = function setText(elemToSet) {
+            var data = getSelected(true);
+            elemToSet.data_selectedData = data;
+            elemToSet.focus();
+            elemToSet.value = "";
+            elemToSet.value = data.fullText;
+        };
+
+        var qryBox = document.getElementById("qryBox");
+        var style = checkStyle(overlay);
+        var pressedKey = getKey(event);
+        var hlElem, hlElemData;
+        if (style.display === "block") {
+            hlElem = getSelected(false);
+            if (hlElem && pressedKey === UP) {
+                move(hlElem, "up");
+                setText(qryBox, hlElemData);
+            }
+            if (hlElem && pressedKey === DOWN) {
+                move(hlElem, "down");
+                setText(qryBox, hlElemData);
+            }
+            if (hlElem && pressedKey === ENTER) {
+                // TO DO - Initiate search
+            }
+            if (!hlElem && (pressedKey === UP || pressedKey === DOWN)) {
+                setFirst();
+                hlElem = getSelected(false);
+                setText(qryBox, hlElemData);
+            }
+
+            // set matching text to options
+            if (!hlElem && getEqualsText(qryBox.value) != null) {
+                console.log(getEqualsText(qryBox.value));
+                console.log('asdasd');
+            }
+        }
+    }
+
+    function resizeList() {
+        var selDiv = document.getElementById("overSel");
+        var txtCity = document.getElementById("txtCity");
+
+        var style = checkStyle(selDiv);
+        if (style.display === "block") {
+            resizeOverlay(txtCity);
+        }
+    }
+
+    addEvent("click", document, toggleOverlay);
+    addEvent("keydown", document, moveUpandDown);
+    window.onresize = function() {
+        resizeList();
+    };
+</script>
+
+</html>

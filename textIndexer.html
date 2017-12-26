@@ -1,0 +1,404 @@
+<!--Load Data to iKnow from sources of data-->
+<!DOCTYPE HTML>
+<html>
+
+<head>
+
+    <!-- Put your page Title here -->
+    <title> Text Indexer </title>
+    <script type="text/javascript" src="js/tab.js"></script>
+    <script type="text/javascript">
+        function showDB() {
+            var link = "%25cspapp.bi.speed.workflow.clslst2.cls";
+            callBackFunc = "loadClass",
+                parameters = "",
+                width = "400",
+                height = "500",
+                windowParam = "toolbar=no, menubar=no, resizable=yes, scrollbars=yes";
+
+            if (speedModalDialog && typeof speedModalDialog === "function") {
+                speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+            }
+
+        }
+
+        function loadClass(selectedClass) {
+            var fetchClass = function(clsName) {
+                // run server method here
+                return [{
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }, {
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }, {
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }, {
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }, {
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }, {
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "name": "Tweet",
+                    "type": "%String"
+                }, {
+                    "name": "TweetID",
+                    "type": "%String"
+                }, {
+                    "name": "User",
+                    "type": "%String"
+                }];
+            };
+
+            var clearTab = function() {
+                var parent = document.getElementById("propSelection");
+                while (parent.firstChild) {
+                    parent.removeChild(parent.firstChild);
+                }
+            };
+
+            var genRow = function(data) {
+                var createChkBox = function(id, clsName) {
+                    var chkbx = document.createElement("input");
+                    chkbx.type = "checkbox";
+                    chkbx.id = id;
+                    chkbx.name = "chkBox||" + clsName;
+                    return chkbx;
+                };
+
+                var createDropDown = function() {
+                    var sel = document.createElement("select");
+                    var optList = [{
+                        value: "",
+                        text: ""
+                    }, {
+                        value: "c",
+                        text: "Content"
+                    }, {
+                        value: "m",
+                        text: "Metadata"
+                    }, {
+                        value: "s",
+                        text: "Source Identifier"
+                    }];
+                    optList.forEach(function(opt) {
+                        var option = document.createElement("option");
+                        option.text = opt.text;
+                        option.value = opt.value;
+                        sel.add(option);
+                    });
+
+                    return sel;
+                };
+
+                var createRow = function(cellData) {
+                    var elem;
+                    var row = document.createElement("tr");
+                    var td1 = row.insertCell(-1);
+                    td1.appendChild(createChkBox(cellData.id, cellData.clsName));
+                    td1.className = "cellChkBox";
+
+                    var td2 = row.insertCell(-1);
+                    td2.innerHTML = cellData.name;
+
+                    var td3 = row.insertCell(-1);
+                    td3.innerHTML = cellData.type;
+
+                    var td4 = row.insertCell(-1);
+                    td4.appendChild(createDropDown());
+                    td4.className = "cellIdxAs";
+
+                    row.appendChild(td1);
+                    row.appendChild(td2);
+                    row.appendChild(td3);
+                    row.appendChild(td4);
+                    return row;
+                };
+
+                return createRow(data);
+            };
+
+            var drawTable = function(d) {
+                var tbdy = document.getElementById("propSelection");
+                if (d.length > 0) {
+                    d.forEach(function(rowData) {
+                        tbdy.appendChild(genRow(rowData));
+                    });
+                }
+            };
+            document.getElementById("txtclsName").value = selectedClass;
+            clearTab();
+            drawTable(fetchClass(selectedClass));
+        }
+    </script>
+    <link rel=stylesheet type=text/css href=css/style.css>
+    <link rel=stylesheet type=text/css href=webStyle.css>
+    <link rel="stylesheet" href="css/jqcloud.css" type="text/css">
+    <!-- #include file = "../general.csp" -->
+    <style type="text/css">
+        /*Custom page style*/
+        
+        .fullSize {
+            height: 100%;
+            width: 100%;
+        }
+        
+        table {
+            border-collapse: collapse;
+        }
+        
+        .edgeLayoutRel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .edgeLayout {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        
+        tr {
+            vertical-align: top;
+        }
+        
+        .cellChkBox {
+            width: 30px;
+        }
+        
+        .cellIdxAs {
+            width: 50px;
+        }
+        
+        table.scroll thead,
+        table.scroll tbody {
+            display: block;
+        }
+        
+        table.scroll tbody {
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        table.scroll td {
+            border: 1px solid #cccccc;
+            height: 25px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body onload="sTab('d1','d2,d3');">
+    <div class="fullSize">
+        <table class="fullSize" cellpadding="0" cellspacing="0">
+            <tr style="vertical-align:middle;">
+                <td class="divMnHdr" style="height:30px"><span>#($$$Text("Text Indexer"))#</span></td>
+            </tr>
+
+            <!--Tabs-->
+            <tr>
+                <td style="height:25px;">
+                    <table cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td>
+                                <div id="td1" class="tab" onclick="sTab('d1','d2,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Source</div>
+                            </td>
+                            <td>
+                                <div id="td2" class="tab" onclick="sTab('d2','d1,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Domain</div>
+                            </td>
+                            <td>
+                                <div id="td3" class="tab" onclick="sTab('d3','d1,d2')" onmouseover="mover(this)" onmouseout="mout(this)">Pre-Process</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="tabFrm fullSize">
+                        <!--Source Selection-->
+                        <div id=d1 class="tabDiv fullSize">
+                            <table class="fullSize" cellpadding="5" cellspacing="0">
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <table cellpadding="5" cellspacing="0">
+                                                <tr>
+                                                    <td>
+                                                        <span class="inputLabel">Class:</span>
+                                                    </td>
+                                                    <td>
+                                                        <input id="txtclsName" type="text" class="txtField" style="width:250px" />
+                                                        <button class="button" onclick="showDB()">Database</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <span class="inputLabel">Category:</span>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" class="txtField" style="width:250px;" />
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:100%">
+                                        <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;">
+                                            <table cellpadding="0" cellspacing="0" class="tblGrid" style="position:absolute;top:0px;left:0px;">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width:30px"></th>
+                                                        <th>Property Name</th>
+                                                        <th>Type</th>
+                                                        <th style="width:50px">Index As</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="propSelection">
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:30px">
+                                        <div style="float:right;padding-right:10px;">
+                                            <button class="button">Clear</button>
+                                            <button class="button">New</button>
+                                            <button class="button">Next</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!--
+							Domain Selection
+							TODO: 1) Domain Creation/Info
+						-->
+                        <div id=d2 class="tabDiv fullSize">
+                            <table class="fullSize" cellpadding="5" cellspacing="0">
+                                <tr>
+                                    <td>Domain</td>
+                                    <td>
+                                        <select id="domainSel" style="width:250px">
+                                            <option value=""></option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr style="height: 100%;">
+                                    <td colspan="2">
+                                        <div class="fullSize bdrStyle">
+                                            Domain Info
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:30px;" colspan="2">
+                                        <div style="float:right;padding-right:10px;">
+                                            <button class="button">Clear</button>
+                                            <button class="button">New</button>
+                                            <button class="button">Next</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!--
+							Pre Processing
+							TODO: 1) Include Regex Entry
+								  2) Include User Dictionary
+						-->
+                        <div id=d3 class="tabDiv fullSize">
+                            <table class="fullSize" cellpadding="5" cellspacing="0">
+                                <tr>
+                                    <td style="height: 100%;width:50%">
+                                        Regular Expression
+                                    </td>
+                                    <td>
+                                        User Dictionary
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+
+</html>

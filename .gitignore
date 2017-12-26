@@ -2,3 +2,6 @@ __pycache__/twTOM.cpython-35.pyc
 *.pyc
 MyGrants.sql
 .vscode/settings.json
+contextMenuJS.js
+insertImage.html
+svgContextMenu.svg

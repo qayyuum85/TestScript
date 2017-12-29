@@ -7,10 +7,53 @@
     <!-- Put your page Title here -->
     <title> Text Indexer </title>
     <script type="text/javascript" src="js/tab.js"></script>
+    <script type="text/javascript" src="js/ImageMenu.js"></script>
     <script type="text/javascript">
+        function showCategory(selectId, selectedType) {
+            var link = "%25cspapp.bi.speed.workflow.clslst2.cls?KB=1&hideThread=" + ((selectedType == "c") ? "1" : "0"),
+                callBackFunc = "loadCategory",
+                parameters = selectId,
+                width = "350",
+                height = "610",
+                windowParam = "center=yes,status=no,scroll=no,help=no,resizable=yes";
+
+            if (speedModalDialog && typeof speedModalDialog === "function") {
+                speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+            }
+        }
+
+        function loadCategory(selectedCategory, selectId) {
+            //console.log(selectedCategory, selectId);
+            var populateCell = function(id, name) {
+                var span = document.getElementById(id.replace(/drp/i, "name"));
+                if (span) {
+                    span.innerHTML = name;
+                }
+            };
+
+            var retProp = function(selected) {
+                var r = selected.split(String.fromCharCode(2));
+                return {
+                    fType: r[0],
+                    id: r[1],
+                    name: r[2]
+                };
+            }(selectedCategory);
+
+
+            var sel = document.getElementById(selectId),
+                val = sel[sel.selectedIndex].value;
+            if ((/\|\|/i.test(retProp.id) == true) && (val == "c")) {
+                alert("Please select a thread.");
+                return;
+            }
+            console.log(retProp);
+            populateCell(selectId, retProp.name);
+        }
+
         function showDB() {
-            var link = "%25cspapp.bi.speed.workflow.clslst2.cls";
-            callBackFunc = "loadClass",
+            var link = "%25cspapp.bi.speed.workflow.clslst2.cls",
+                callBackFunc = "loadClass",
                 parameters = "",
                 width = "400",
                 height = "500",
@@ -37,84 +80,6 @@
                 }, {
                     "name": "TweetID",
                     "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
-                }, {
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
-                }, {
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
-                }, {
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
-                }, {
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
-                }, {
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }, {
-                    "name": "User",
-                    "type": "%String"
                 }];
             };
 
@@ -125,7 +90,8 @@
                 }
             };
 
-            var genRow = function(data) {
+            var genRow = function(data, idx) {
+                var chkPushToKB = document.getElementById("chkToKM").checked;
                 var createChkBox = function(id, clsName) {
                     var chkbx = document.createElement("input");
                     chkbx.type = "checkbox";
@@ -134,34 +100,108 @@
                     return chkbx;
                 };
 
-                var createDropDown = function() {
+                var optList = function(isKM) {
+                    var catFunc = function(dropElem) {
+                        var thisDropDown = dropElem;
+                        var currRow = dropElem.parentNode.parentNode;
+                        var selectedValue = thisDropDown[thisDropDown.selectedIndex].value;
+
+                        var createBtn = function(type) {
+                            var btn = document.createElement("button");
+                            btn.className = "button catBtn";
+                            btn.innerHTML = "Select " + (selectedValue == "c" ? "Category" : "Thread");
+                            btn.onclick = function(id, val) {
+                                var id = id,
+                                    val = val;
+                                return function() {
+                                    showCategory(id, val);
+                                }
+                            }(thisDropDown.id, selectedValue);
+                            return btn;
+                        };
+
+                        var createLbl = function() {
+                            var span = document.createElement("span");
+                            span.id = thisDropDown.id.replace(/drp/ig, "name");
+                            return span;
+                        };
+
+                        if (selectedValue == "c" || selectedValue == "t") {
+                            currRow.lastChild.appendChild(createBtn(selectedValue));
+                            currRow.lastChild.appendChild(createLbl());
+                        }
+                    };
+
+                    if (isKM) {
+                        return [{
+                            value: "",
+                            text: ""
+                        }, {
+                            value: "c",
+                            text: "Category",
+                            f: catFunc
+                        }, {
+                            value: "t",
+                            text: "Thread"
+                        }, {
+                            value: "p",
+                            text: "Post"
+                        }, {
+                            value: "dt",
+                            text: "Post Date"
+                        }, {
+                            value: "tm",
+                            text: "Post Time"
+                        }];
+
+                    } else {
+                        return [{
+                            value: "",
+                            text: ""
+                        }, {
+                            value: "c",
+                            text: "Content"
+                        }, {
+                            value: "m",
+                            text: "Metadata"
+                        }, {
+                            value: "d",
+                            text: "Record Date"
+                        }, {
+                            value: "t",
+                            text: "Record Time"
+                        }];
+                    }
+
+                }(chkPushToKB);
+
+                var createDropDown = function(optList, i) {
                     var sel = document.createElement("select");
-                    var optList = [{
-                        value: "",
-                        text: ""
-                    }, {
-                        value: "c",
-                        text: "Content"
-                    }, {
-                        value: "m",
-                        text: "Metadata"
-                    }, {
-                        value: "s",
-                        text: "Source Identifier"
-                    }];
+                    sel.id = "drp||" + selectedClass + "||" + i;
+                    var optList = optList;
                     optList.forEach(function(opt) {
                         var option = document.createElement("option");
                         option.text = opt.text;
                         option.value = opt.value;
+                        if (opt.f && typeof(opt.f) == "function") {
+                            sel.onchange = function() {
+                                return function() {
+                                    opt.f(sel);
+                                }();
+                            };
+                        }
                         sel.add(option);
                     });
 
                     return sel;
                 };
 
-                var createRow = function(cellData) {
-                    var elem;
+                var createRow = function(cellData, optionList, idx) {
                     var row = document.createElement("tr");
+                    row.data_detail = {
+                        name: cellData.name,
+                        type: cellData.type
+                    };
                     var td1 = row.insertCell(-1);
                     td1.appendChild(createChkBox(cellData.id, cellData.clsName));
                     td1.className = "cellChkBox";
@@ -173,24 +213,22 @@
                     td3.innerHTML = cellData.type;
 
                     var td4 = row.insertCell(-1);
-                    td4.appendChild(createDropDown());
+                    td4.appendChild(createDropDown(optionList, idx));
                     td4.className = "cellIdxAs";
 
-                    row.appendChild(td1);
-                    row.appendChild(td2);
-                    row.appendChild(td3);
-                    row.appendChild(td4);
+                    var td5 = row.insertCell(-1);
+
                     return row;
                 };
 
-                return createRow(data);
+                return createRow(data, optList, idx);
             };
 
             var drawTable = function(d) {
                 var tbdy = document.getElementById("propSelection");
                 if (d.length > 0) {
-                    d.forEach(function(rowData) {
-                        tbdy.appendChild(genRow(rowData));
+                    d.forEach(function(rowData, rowIdx) {
+                        tbdy.appendChild(genRow(rowData, rowIdx));
                     });
                 }
             };
@@ -198,9 +236,375 @@
             clearTab();
             drawTable(fetchClass(selectedClass));
         }
+
+        function getSelectedProp() {
+            var checkSelection = function checkSelection(r) {
+                var content = 0,
+                    identifier = 0,
+                    metadata = 0,
+                    time = 0,
+                    date = 0;
+                r.forEach(function(selected) {
+                    switch (selected.indexAs) {
+                        case "c":
+                            content++;
+                            break;
+                        case "m":
+                            metadata++;
+                            break;
+                        case "s":
+                            identifier++;
+                            break;
+                        case "d":
+                            date++;
+                            break;
+                        case "t":
+                            time++;
+                            break;
+                        default:
+                            break;
+                    }
+                });
+                return {
+                    content: content,
+                    identifier: identifier,
+                    metadata: metadata
+                };
+            };
+
+            var tb = document.getElementById("propSelection");
+            var propLen = tb.rows.length;
+            var selected = [];
+            var row, currObj, selOpt, lastChildInRow;
+            for (var i = 0; i < propLen; i++) {
+                row = tb.children[i];
+                if (row.firstChild.firstChild.checked == true) {
+                    currObj = row.data_detail;
+                    selOpt = row[3].firstChild;
+                    currObj["indexAs"] = selOpt[selOpt.selectedIndex].value;
+                    if (currObj["indexAs"] == "c" || currObj["indexAs"] == "t") {
+                        lastChildInRow = row.lastChild.lastChild;
+                        currObj["name"] = lastChildInRow.innerHTML;
+                    }
+                    selected.push(currObj);
+                }
+            }
+
+            console.log(checkSelection(selected));
+            return selected;
+        }
+
+        function loadDomainList() {
+            var domDropDown = document.getElementById("domainSel");
+            var data = [{
+                "domId": 1,
+                "domName": "iKnowSample"
+            }, {
+                "domId": 11,
+                "domName": "KM"
+            }];
+
+            data.forEach(function(domain) {
+                var option = document.createElement("option");
+                option.text = domain.domName;
+                option.value = domain.domId;
+                domDropDown.add(option);
+            });
+        }
+
+        function loadDomainDetail(domId) {
+            var selectedDom = document.getElementById("domainSel");
+            var val = selectedDom[selectedDom.selectedIndex].value;
+            if (val == "") {
+                return;
+            }
+
+            var data = {
+                "domName": "KM",
+                "entCnt": 13561,
+                "metadata": [{
+                    "dataType": "DATE",
+                    "fId": 1,
+                    "fName": "DateIndexed",
+                    "ops": "=,!=,<,<=,>,>="
+                }, {
+                    "dataType": "STRING",
+                    "fId": 2,
+                    "fName": "PostId",
+                    "ops": "=,!="
+                }, {
+                    "dataType": "STRING",
+                    "fId": 3,
+                    "fName": "AttachmentId",
+                    "ops": "=,!="
+                }, {
+                    "dataType": "STRING",
+                    "fId": 4,
+                    "fName": "Type",
+                    "ops": "=,!="
+                }, {
+                    "dataType": "NUMBER",
+                    "fId": 5,
+                    "fName": "CategoryId",
+                    "ops": "=,!="
+                }, {
+                    "dataType": "DATE",
+                    "fId": 6,
+                    "fName": "PostDate",
+                    "ops": "=,!=,>,<,<=,>="
+                }, {
+                    "dataType": "NUMBER",
+                    "fId": 7,
+                    "fName": "TotalSentiment",
+                    "ops": "=,!=,>,<,<=,>="
+                }],
+                "sentCnt": 4392,
+                "srcCnt": 586
+            }
+
+            var domName = document.getElementById("txtDomName");
+            var srcCnt = document.getElementById("txtSrcCnt");
+            var entCnt = document.getElementById("txtEntCnt");
+            var sentCnt = document.getElementById("txtSentCnt");
+            var metaTab = document.getElementById("tabMetadata");
+
+            domName.innerHTML = data.domName;
+            srcCnt.innerHTML = data.srcCnt;
+            sentCnt.innerHTML = data.sentCnt;
+            entCnt.innerHTML = data.entCnt;
+
+            // create metadata
+            while (metaTab.firstChild) {
+                metaTab.removeChild(metaTab.firstChild);
+            }
+
+            if (data.metadata.length > 0) {
+                data.metadata.forEach(function(md) {
+                    var tr = document.createElement("tr");
+                    var td1 = tr.insertCell(-1);
+                    td1.innerHTML = md.fId;
+                    td1.className = "idWidth";
+
+                    var td2 = tr.insertCell(-1);
+                    td2.innerHTML = md.fName;
+
+                    var td3 = tr.insertCell(-1);
+                    td3.innerHTML = md.ops;
+
+                    var td4 = tr.insertCell(-1);
+                    td4.innerHTML = md.dataType;
+
+                    metaTab.appendChild(tr);
+                });
+            }
+        }
+
+        function loadExpr() {
+            var data = [];
+            data.forEach(function(item) {
+                newEntry("tbRgxList", item.regex, item.replacement);
+            });
+        }
+
+        var newEntry = function createNewEntry(tbdyId, strExpr, strRep, converter) {
+            var resetCount = function(tbId) {
+                return function() {
+                    var tbList = document.getElementById(tbId);
+                    var rowCnt = tbList.rows.length;
+
+                    for (var i = 0; i < rowCnt; i++) {
+                        tbList.children[i].firstChild.innerHTML = i + 1;
+                    }
+                };
+            }(tbdyId);
+
+            var tbList = document.getElementById(tbdyId);
+            var rowCnt = tbList.rows.length;
+            var tr = document.createElement("tr");
+            var td1 = tr.insertCell(-1);
+            td1.innerHTML = rowCnt + 1;
+            var td2 = tr.insertCell(-1);
+            td2.innerHTML = strExpr;
+            var td3 = tr.insertCell(-1);
+            td3.innerHTML = strRep;
+            var td4 = tr.insertCell(-1);
+            var remBtn = document.createElement("button");
+            remBtn.innerHTML = "X";
+            remBtn.className = "button";
+            remBtn.onclick = function(currRow) {
+                var thisTr = currRow;
+                return function() {
+                    var parent = thisTr.parentNode;
+                    parent.removeChild(thisTr);
+                    resetCount();
+                };
+            }(tr);
+            td4.appendChild(remBtn);
+
+            // Optional function converter 
+            if (converter && typeof(converter) == "function") {
+                strRep = converter(strRep);
+            }
+
+            //append data
+            tr.data_detail = {
+                expr: strExpr,
+                rep: strRep
+            };
+
+            tbList.appendChild(tr);
+        };
+
+        function addExpr() {
+            var expr = document.getElementById("rgxArea").value;
+            var rep = document.getElementById("rgxReplace").value;
+            if (expr == "") {
+                return;
+            }
+
+            var isValid = true;
+            try {
+                new RegExp(expr);
+            } catch (e) {
+                isValid = false;
+            }
+
+            if (!isValid) {
+                alert("Invalid Regular Expression.");
+                return;
+            }
+            newEntry("tbRgxList", expr, rep);
+        }
+
+        function getExpr(eId) {
+            var tb = document.getElementById(eId);
+            var rowLen = tb.rows.length;
+            var list = [];
+            for (var i = 0; i < rowLen; i++) {
+                list.push(tb.rows[i].data_detail);
+            }
+            console.log(list);
+            return list;
+        }
+
+        function loadDict() {
+            var data = [];
+
+            var converter = function(stat) {
+                if (stat == "Positive") {
+                    return "@sentPos";
+                }
+                if (stat == "Negative") {
+                    return "@sentNeg";
+                }
+            };
+
+            data.forEach(function(item) {
+                newEntry("tbDictList", item.dictExpr, item.dictReplace, converter);
+            });
+        }
+
+        function addDict() {
+            var term = document.getElementById("txtDictOri").value;
+            var rep = document.getElementById("txtDictRep").value;
+            var radios = document.getElementsByName("sentiment");
+
+            var converter = function(stat) {
+                if (stat == "Positive") {
+                    return "@sentPos";
+                }
+                if (stat == "Negative") {
+                    return "@sentNeg";
+                }
+            };
+
+            if (term == "") {
+                return;
+            }
+
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].checked == true) {
+                    if (radios[i].id != "sentNone") {
+                        rep = radios[i].id == "sentPos" ? "Positive" : "Negative";
+                    }
+                }
+            }
+            newEntry("tbDictList", term, rep, converter);
+        }
+
+        function toggleRep() {
+            var radios = document.getElementsByName("sentiment");
+            var divtoDisp = document.getElementById("txtDivRep");
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].checked == true && radios[i].id == "sentNone") {
+                    divtoDisp.style.display = "block";
+                    return;
+                } else {
+                    divtoDisp.style.display = "none";
+                }
+            }
+        }
+
+        function getRegexDict() {
+            getExpr("tbRgxList");
+            getExpr("tbDictList");
+        }
+
+        function saveSetting() {
+            // get configname
+            var configname = document.getElementById("txtConfigName").value;
+
+            // get selected property
+            var selectedProp = getSelectedProp();
+
+            // get input dict
+            var dict = getExpr("tbDictList");
+
+            // get input regex
+            var regex = getExpr("tbRgxList");
+
+            // get domain id
+            var selDom = document.getElementById("domainSel");
+            var domid = selDom[selDom.selectedIndex].value;
+
+            // get classname
+            var clsName = document.getElementById("txtclsName").value;
+
+            // get category
+            var cat = document.getElementById("txtCategory").value;
+
+            // get sql statement
+            var sql = document.getElementById("sqlQry").value;
+
+            // get push to kb
+            var pushtokb = document.getElementById("chkToKM").checked;
+
+            // get index sentiment
+            var idxSenti = document.getElementById("chkforSenti").checked;
+
+            // combine all setting
+            var setting = {
+                ConfigName: configname,
+                ClassName: clsName,
+                Category: cat,
+                SQLQuery: sql,
+                PushToKB: pushtokb,
+                IsSentiment: idxSenti,
+                SelectedProperty: selectedProp,
+                DomainId: domid,
+                DictTerm: dict,
+                RegExp: regex
+            }
+
+            var strSetting = JSON.stringify(setting);
+            // server method
+            var sc = #server( % BI.iKnow.TextIndexer.SaveSetting(strSetting))#;
+
+        }
     </script>
-    <link rel=stylesheet type=text/css href=css/style.css>
-    <link rel=stylesheet type=text/css href=webStyle.css>
+    <link rel=stylesheet type="text/css" href="css/rptStyle.css">
+    <link rel=stylesheet type="text/css" href="css/style.css">
+    <link rel=stylesheet type="text/css" href="webStyle.css">
     <link rel="stylesheet" href="css/jqcloud.css" type="text/css">
     <!-- #include file = "../general.csp" -->
     <style type="text/css">
@@ -231,8 +635,9 @@
             vertical-align: top;
         }
         
-        .cellChkBox {
+        td.cellChkBox {
             width: 30px;
+            border-left-style: none;
         }
         
         .cellIdxAs {
@@ -255,29 +660,50 @@
             height: 25px;
             vertical-align: middle;
         }
+        
+        .idWidth {
+            width: 1%;
+        }
+        
+        button.catBtn {
+            width: 100px;
+        }
     </style>
 </head>
 
-<body onload="sTab('d1','d2,d3');">
+<body onload="sTab('d1','d2,d3,d4'); loadDomainList();">
     <div class="fullSize">
         <table class="fullSize" cellpadding="0" cellspacing="0">
             <tr style="vertical-align:middle;">
                 <td class="divMnHdr" style="height:30px"><span>#($$$Text("Text Indexer"))#</span></td>
             </tr>
-
+            <tr class="toolbar" style="height: 25px;">
+                <td>
+                    <table cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td class="imgMenu"><img alt="New" src="img/anzIco/new.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)"></td>
+                            <td class="imgMenu"><img alt="Open" src="img/anzIco/open.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)"></td>
+                            <td class="imgMenu"><img alt="Save" src="img/anzIco/save1.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting()"></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
             <!--Tabs-->
             <tr>
-                <td style="height:25px;">
+                <td style="height:25px;padding-top: 3px;">
                     <table cellpadding="0" cellspacing="0">
                         <tr>
                             <td>
-                                <div id="td1" class="tab" onclick="sTab('d1','d2,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Source</div>
+                                <div id="td1" class="tab" onclick="sTab('d1','d2,d3,d4')" onmouseover="mover(this)" onmouseout="mout(this)">Source</div>
                             </td>
                             <td>
-                                <div id="td2" class="tab" onclick="sTab('d2','d1,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Domain</div>
+                                <div id="td2" class="tab" onclick="sTab('d2','d1,d3,d4')" onmouseover="mover(this)" onmouseout="mout(this)">Domain</div>
                             </td>
                             <td>
-                                <div id="td3" class="tab" onclick="sTab('d3','d1,d2')" onmouseover="mover(this)" onmouseout="mout(this)">Pre-Process</div>
+                                <div id="td3" class="tab" onclick="sTab('d3','d1,d2,d4')" onmouseover="mover(this)" onmouseout="mout(this)">Pre-Process</div>
+                            </td>
+                            <td>
+                                <div id="td4" class="tab" onclick="sTab('d4','d1,d2,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Review</div>
                             </td>
                         </tr>
                     </table>
@@ -295,11 +721,22 @@
                                             <table cellpadding="5" cellspacing="0">
                                                 <tr>
                                                     <td>
+                                                        <span class="inputLabel">Configuration Name:</span>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="txtConfigName" id="txtConfigName" class="txtField" style="width:250px" />
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
                                                         <span class="inputLabel">Class:</span>
                                                     </td>
                                                     <td>
                                                         <input id="txtclsName" type="text" class="txtField" style="width:250px" />
                                                         <button class="button" onclick="showDB()">Database</button>
+                                                    </td>
+                                                    <td>
+                                                        <input type="checkbox" id="chkToKM" checked/><label for="chkToKM">Push to Knowledge Base</label>
                                                     </td>
                                                 </tr>
                                                 <tr>
@@ -307,7 +744,16 @@
                                                         <span class="inputLabel">Category:</span>
                                                     </td>
                                                     <td>
-                                                        <input type="text" class="txtField" style="width:250px;" />
+                                                        <input type="text" id="txtCategory" class="txtField" style="width:250px;" />
+                                                    </td>
+                                                    <td>
+                                                        <input type="checkbox" id="chkforSenti" /><label for="chkforSenti">Index As Sentiment</label>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>SQL Query:</td>
+                                                    <td colspan="2">
+                                                        <textarea name="sqlText" id="sqlQry" cols="30" rows="5" style="width: 99%;"></textarea>
                                                     </td>
                                                 </tr>
                                             </table>
@@ -316,14 +762,15 @@
                                 </tr>
                                 <tr>
                                     <td style="height:100%">
-                                        <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;">
+                                        <div class="bdrStyle" style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;padding:3px;">
                                             <table cellpadding="0" cellspacing="0" class="tblGrid" style="position:absolute;top:0px;left:0px;">
                                                 <thead>
-                                                    <tr>
-                                                        <th style="width:30px"></th>
-                                                        <th>Property Name</th>
-                                                        <th>Type</th>
-                                                        <th style="width:50px">Index As</th>
+                                                    <tr class="titleBar">
+                                                        <td style="width:30px"></td>
+                                                        <td>Property Name</td>
+                                                        <td>Type</td>
+                                                        <td style="width:50px">Index As</td>
+                                                        <td style="width:10%;">Add. Option</td>
                                                     </tr>
                                                 </thead>
                                                 <tbody id="propSelection">
@@ -335,6 +782,7 @@
                                 <tr>
                                     <td style="height:30px">
                                         <div style="float:right;padding-right:10px;">
+                                            <button class="button" onclick=getSelectedProp()>Get Prop</button>
                                             <button class="button">Clear</button>
                                             <button class="button">New</button>
                                             <button class="button">Next</button>
@@ -353,15 +801,49 @@
                                 <tr>
                                     <td>Domain</td>
                                     <td>
-                                        <select id="domainSel" style="width:250px">
+                                        <select id="domainSel" style="width:250px" onchange="loadDomainDetail();">
                                             <option value=""></option>
                                         </select>
+                                        <button class="button" onclick="createDomain()">Create</button>
                                     </td>
                                 </tr>
                                 <tr style="height: 100%;">
                                     <td colspan="2">
                                         <div class="fullSize bdrStyle">
-                                            Domain Info
+                                            <table style="width:100%;" cellpadding="5" cellspacing="0">
+                                                <tr>
+                                                    <td style="width:1%;">Domain Name:</td>
+                                                    <td><span id="txtDomName"></span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total Sources:</td>
+                                                    <td><span id="txtSrcCnt"></span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Indexed Entities:</td>
+                                                    <td><span id="txtEntCnt"></span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Indexed Sentences:</td>
+                                                    <td><span id="txtSentCnt"></span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Metadata:</td>
+                                                    <td>
+                                                        <table cellpadding="0" cellspacing="0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <td class="idWidth">Id</td>
+                                                                    <td>Field Name</td>
+                                                                    <td>Operator</td>
+                                                                    <td>Type</td>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="tabMetadata"></tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            </table>
                                         </div>
                                     </td>
                                 </tr>
@@ -383,13 +865,147 @@
 								  2) Include User Dictionary
 						-->
                         <div id=d3 class="tabDiv fullSize">
-                            <table class="fullSize" cellpadding="5" cellspacing="0">
+                            <table class="fullSize" cellpadding="3" cellspacing="5">
                                 <tr>
-                                    <td style="height: 100%;width:50%">
-                                        Regular Expression
+                                    <td style="height: 100%;width: 50%">
+                                        <div class="fullSize bdrStyle">
+                                            <table class="fullSize" cellpadding="3" cellspacing="0">
+                                                <tr style="vertical-align: middle;" class="titleBar">
+                                                    <td style="height:30px;">
+                                                        Regular Expression
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="height: 150px;">
+                                                        <table class="fullSize" cellpadding="0" cellspacing="0">
+                                                            <tr>
+                                                                <td style="width: 10%;">Expression:</td>
+                                                                <td><textarea name="rgxArea" id="rgxArea" cols="30" rows="3" style="width: 99%;"></textarea></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>Replacement:</td>
+                                                                <td><textarea name="rgxReplace" id="rgxReplace" cols="30" rows="3" style="width: 99%;"></textarea></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td colspan="2">
+                                                                    <div style="float: right; padding-right: 5px;"><button class="button" onclick="addExpr()">Add</button></div>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="height:100%">
+                                                        <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;padding:3px;">
+                                                            <table class="tblGrid" cellpadding="2" cellspacing="0" style="position:absolute;top:0px;left:0px;width: 100%;">
+                                                                <thead>
+                                                                    <tr class="titleBar">
+                                                                        <td style="width: 1%;">No.</td>
+                                                                        <td>Expression</td>
+                                                                        <td>Replacement</td>
+                                                                        <td style="width: 1%;"></td>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody id="tbRgxList"></tbody>
+                                                            </table>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
                                     </td>
                                     <td>
-                                        User Dictionary
+                                        <div class="fullSize bdrStyle">
+                                            <table class="fullSize" cellpadding="3" cellspacing="0">
+                                                <tr style="vertical-align: middle;" class="titleBar">
+                                                    <td style="height:30px;">User Dictionary</td>
+                                                    <td>
+                                                        <div style="float:right;padding-right: 5px;">
+                                                            <input id="chkDefSent" type="checkbox" value="defSent" />
+                                                            <label for="chkDefSent">Use Default Sentiment</label>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td colspan="2" style="height:150px;">
+                                                        <table class="fullSize" cellpadding="0" cellspacing="0">
+                                                            <tr>
+                                                                <td style="width: 10%;">Term:</td>
+                                                                <td><input type="text" name="txtDictOri" id="txtDictOri" class="txtField" style="width: 99%;" /></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style="vertical-align: middle">Type:</td>
+                                                                <td style="vertical-align: middle">
+                                                                    <div>
+                                                                        <input type="radio" name="sentiment" id="sentNone" value="none" onclick="toggleRep()" checked/><label for="sentNone">None</label>
+                                                                        <input type="radio" name="sentiment" id="sentPos" value="p" onclick="toggleRep()" /><label for="sentPos">Positive</label>
+                                                                        <input type="radio" name="sentiment" id="sentNeg" value="n" onclick="toggleRep()" /><label for="sentNeg">Negative</label>
+                                                                    </div>
+                                                                    <div id="txtDivRep">
+                                                                        <input type="text" name="txtDictRep" id="txtDictRep" class="txtField" style="width: 99%;" />
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td colspan="2">
+                                                                    <div style="float: right; padding-right: 5px;"><button class="button" onclick="addDict()">Add</button></div>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td colspan="2" style="height:100%">
+                                                        <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;padding:3px;">
+                                                            <table class="tblGrid" cellpadding="2" cellspacing="0" style="position:absolute;top:0px;left:0px;width: 100%;">
+                                                                <thead>
+                                                                    <tr class="titleBar">
+                                                                        <td style="width:1%">No.</td>
+                                                                        <td>Term</td>
+                                                                        <td>Type / Replacement</td>
+                                                                        <td style="width: 1%;"></td>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody id="tbDictList"></tbody>
+                                                            </table>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:30px" colspan="2">
+                                        <div style="float:right;padding-right:10px;">
+                                            <button class="button" onclick="getRegexDict()">Get Prop</button>
+                                            <button class="button">Clear</button>
+                                            <button class="button">New</button>
+                                            <button class="button">Next</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <!--
+							Review
+							TODO: 1) Show All Settings
+								  2) Indexing Logs
+						-->
+                        <div id="d4" class="tabDiv fullSize">
+                            <table class="fullSize" cellpadding="5" cellspacing="0">
+                                <tr>
+                                    <td style="height:100%;">
+
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="height:30px">
+                                        <div style="float:right;padding-right:10px;">
+                                            <button class="button">Clear</button>
+                                            <button class="button">New</button>
+                                            <button class="button">Next</button>
+                                        </div>
                                     </td>
                                 </tr>
                             </table>

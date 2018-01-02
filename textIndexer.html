@@ -9,25 +9,61 @@
     <script type="text/javascript" src="js/tab.js"></script>
     <script type="text/javascript" src="js/ImageMenu.js"></script>
     <script type="text/javascript">
-        function showCategory(selectId, selectedType) {
-            var link = "%25cspapp.bi.speed.workflow.clslst2.cls?KB=1&hideThread=" + ((selectedType == "c") ? "1" : "0"),
-                callBackFunc = "loadCategory",
-                parameters = selectId,
+        function showCategory(type, id, selectedValue) {
+            var mainCat = document.getElementById("txtCategory"),
+                mainCatVal;
+            if (type == "main") {
+                showCategoryByType("txtCategory", "c", "loadCategoryMain");
+            }
+            if (type == "sub") {
+                mainCatVal = (mainCat.data_selected) ? mainCat.data_selected.mainCatId : "";
+                showCategoryByType(id, selectedValue, "loadCategorySub", mainCatVal);
+            }
+        }
+
+        function showCategoryByType(eId, selectedType, cb, mainCatId) {
+            var link = "%25cspapp.bi.speed.workflow.clslst2.cls?treeType=KB&hideThread=" + ((selectedType == "c") ? "1" : "0"),
+                callBackFunc = cb,
+                parameters = eId,
                 width = "350",
                 height = "610",
                 windowParam = "center=yes,status=no,scroll=no,help=no,resizable=yes";
 
+            if (mainCatId != "" && typeof(mainCatId) != "undefined") {
+                link = link + "&catId=" + mainCatId;
+            }
             if (speedModalDialog && typeof speedModalDialog === "function") {
                 speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
             }
         }
 
-        function loadCategory(selectedCategory, selectId) {
-            //console.log(selectedCategory, selectId);
-            var populateCell = function(id, name) {
-                var span = document.getElementById(id.replace(/drp/i, "name"));
+        function loadCategoryMain(selectedCategory, elemId) {
+            var elem = document.getElementById(elemId);
+            var retProp = function(selected) {
+                var r = selected.split(String.fromCharCode(2));
+                return {
+                    fType: r[0],
+                    id: r[1],
+                    name: r[2]
+                };
+            }(selectedCategory);
+
+            elem.value = retProp.name;
+            elem.data_selected = {
+                mainCatId: retProp.id,
+                mainCatName: retProp.name
+            }
+        }
+
+        function loadCategorySub(selectedCategory, selectId) {
+            var populateCell = function(eId, catId, name) {
+                var span = document.getElementById(eId.replace(/drp/i, "name"));
                 if (span) {
-                    span.innerHTML = name;
+                    span.innerHTML = name + " [" + catId + "]";
+                    span.parentNode.data_selected = {
+                        id: catId,
+                        name: name
+                    };
                 }
             };
 
@@ -43,12 +79,12 @@
 
             var sel = document.getElementById(selectId),
                 val = sel[sel.selectedIndex].value;
-            if ((/\|\|/i.test(retProp.id) == true) && (val == "c")) {
+            if ((/\|\|/i.test(retProp.id) == false) && (val == "t")) {
                 alert("Please select a thread.");
                 return;
             }
             console.log(retProp);
-            populateCell(selectId, retProp.name);
+            populateCell(selectId, retProp.id, retProp.name);
         }
 
         function showDB() {
@@ -92,16 +128,24 @@
 
             var genRow = function(data, idx) {
                 var chkPushToKB = document.getElementById("chkToKM").checked;
-                var createChkBox = function(id, clsName) {
+                var createChkBox = function(propName, clsName) {
                     var chkbx = document.createElement("input");
                     chkbx.type = "checkbox";
-                    chkbx.id = id;
+                    chkbx.id = "chkBox||" + clsName + "||" + propName;
                     chkbx.name = "chkBox||" + clsName;
                     return chkbx;
                 };
 
                 var optList = function(isKM) {
                     var catFunc = function(dropElem) {
+                        var clearCell = function(e) {
+                            if (e) {
+                                while (e.firstChild) {
+                                    e.removeChild(e.firstChild);
+                                }
+                            }
+                        };
+
                         var thisDropDown = dropElem;
                         var currRow = dropElem.parentNode.parentNode;
                         var selectedValue = thisDropDown[thisDropDown.selectedIndex].value;
@@ -114,18 +158,24 @@
                                 var id = id,
                                     val = val;
                                 return function() {
-                                    showCategory(id, val);
+                                    showCategory("sub", id, val);
                                 }
                             }(thisDropDown.id, selectedValue);
                             return btn;
                         };
 
                         var createLbl = function() {
+                            var div = document.createElement("div");
+                            div.className = "catLbl";
+
                             var span = document.createElement("span");
                             span.id = thisDropDown.id.replace(/drp/ig, "name");
-                            return span;
+
+                            div.appendChild(span);
+                            return div;
                         };
 
+                        clearCell(currRow.lastChild);
                         if (selectedValue == "c" || selectedValue == "t") {
                             currRow.lastChild.appendChild(createBtn(selectedValue));
                             currRow.lastChild.appendChild(createLbl());
@@ -175,21 +225,21 @@
 
                 }(chkPushToKB);
 
-                var createDropDown = function(optList, i) {
+                var createDropDown = function(optList, propName) {
                     var sel = document.createElement("select");
-                    sel.id = "drp||" + selectedClass + "||" + i;
+                    sel.id = "drp||" + selectedClass + "||" + propName;
                     var optList = optList;
                     optList.forEach(function(opt) {
                         var option = document.createElement("option");
                         option.text = opt.text;
                         option.value = opt.value;
-                        if (opt.f && typeof(opt.f) == "function") {
-                            sel.onchange = function() {
-                                return function() {
-                                    opt.f(sel);
-                                }();
-                            };
-                        }
+                        // if (opt.f && typeof(opt.f) == "function") {
+                        //     sel.onchange = function() {
+                        //         return function() {
+                        //             opt.f(sel);
+                        //         }();
+                        //     };
+                        // }
                         sel.add(option);
                     });
 
@@ -203,7 +253,7 @@
                         type: cellData.type
                     };
                     var td1 = row.insertCell(-1);
-                    td1.appendChild(createChkBox(cellData.id, cellData.clsName));
+                    td1.appendChild(createChkBox(cellData.name, selectedClass));
                     td1.className = "cellChkBox";
 
                     var td2 = row.insertCell(-1);
@@ -213,10 +263,10 @@
                     td3.innerHTML = cellData.type;
 
                     var td4 = row.insertCell(-1);
-                    td4.appendChild(createDropDown(optionList, idx));
+                    td4.appendChild(createDropDown(optionList, cellData.name));
                     td4.className = "cellIdxAs";
 
-                    var td5 = row.insertCell(-1);
+                    // var td5 = row.insertCell(-1);
 
                     return row;
                 };
@@ -232,6 +282,7 @@
                     });
                 }
             };
+
             document.getElementById("txtclsName").value = selectedClass;
             clearTab();
             drawTable(fetchClass(selectedClass));
@@ -280,18 +331,55 @@
                 row = tb.children[i];
                 if (row.firstChild.firstChild.checked == true) {
                     currObj = row.data_detail;
-                    selOpt = row[3].firstChild;
+                    selOpt = row.children[3].firstChild;
                     currObj["indexAs"] = selOpt[selOpt.selectedIndex].value;
-                    if (currObj["indexAs"] == "c" || currObj["indexAs"] == "t") {
-                        lastChildInRow = row.lastChild.lastChild;
-                        currObj["name"] = lastChildInRow.innerHTML;
-                    }
+
+                    // Probably disable this
+                    // if (currObj["indexAs"] == "c" || currObj["indexAs"] == "t") {
+                    //     lastChildInRow = row.lastChild.lastChild;
+                    //     currObj["catId"] = lastChildInRow.data_selected.id;
+                    //     currObj["catName"] = lastChildInRow.data_selected.name;
+                    // }
                     selected.push(currObj);
                 }
             }
 
             console.log(checkSelection(selected));
             return selected;
+        }
+
+        function loadSelectedProp(clsName, data) {
+            /*{
+                    "name": "PostDate",
+                    "type": "%Date",
+                    "indexAs": "c",
+                    "catId": "10026",
+                    "catName": "Cat New 141201"
+                }*/
+
+            data.forEach(function(e) {
+                var checkbox = document.getElementById("chkBox||" + clsName + "||" + e.name);
+                var drpDown = document.getElementById("drp||" + clsName + "||" + e.name);
+                var span;
+
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+                if (drpDown) {
+                    drpDown.value = e.indexAs;
+                    // drpDown.onchange();
+
+                    // span = document.getElementById("name||" + clsName + "||" + e.name);
+                    // if (span) {
+                    //     span.innerHTML = e.catName + " [" + e.catId + "]";
+                    //     span.parentNode.data_selected = {
+                    //         catId: e.catId,
+                    //         catName: e.catName
+                    //     };
+                    // }
+                }
+
+            });
         }
 
         function loadDomainList() {
@@ -399,14 +487,23 @@
             }
         }
 
-        function loadExpr() {
-            var data = [];
+        function clearChildren(id) {
+            var elem = document.getElementById(id);
+            if (elem) {
+                while (elem.firstChild) {
+                    elem.removeChild(elem.firstChild);
+                }
+            }
+        }
+
+        function loadExpr(data) {
+            clearChildren("tbRgxList");
             data.forEach(function(item) {
-                newEntry("tbRgxList", item.regex, item.replacement);
+                newEntry("tbRgxList", item.expr, item.rep);
             });
         }
 
-        var newEntry = function createNewEntry(tbdyId, strExpr, strRep, converter) {
+        var newEntry = function createNewEntry(tbdyId, strExpr, strRep, postConverter, preConverter) {
             var resetCount = function(tbId) {
                 return function() {
                     var tbList = document.getElementById(tbId);
@@ -417,6 +514,11 @@
                     }
                 };
             }(tbdyId);
+
+            // Optional function pre converter 
+            if (preConverter && typeof(preConverter) == "function") {
+                strRep = preConverter(strRep);
+            }
 
             var tbList = document.getElementById(tbdyId);
             var rowCnt = tbList.rows.length;
@@ -441,9 +543,9 @@
             }(tr);
             td4.appendChild(remBtn);
 
-            // Optional function converter 
-            if (converter && typeof(converter) == "function") {
-                strRep = converter(strRep);
+            // Optional function post converter 
+            if (postConverter && typeof(postConverter) == "function") {
+                strRep = postConverter(strRep);
             }
 
             //append data
@@ -483,24 +585,34 @@
             for (var i = 0; i < rowLen; i++) {
                 list.push(tb.rows[i].data_detail);
             }
-            console.log(list);
+            // console.log(list);
             return list;
         }
 
-        function loadDict() {
-            var data = [];
+        function loadDict(data) {
+            var preconverter = function(stat) {
+                if (stat == "@sentPos") {
+                    return "Positive";
+                }
+                if (stat == "@sentNeg") {
+                    return "Negative";
+                }
+                return stat;
+            };
 
-            var converter = function(stat) {
+            var postconverter = function(stat) {
                 if (stat == "Positive") {
                     return "@sentPos";
                 }
                 if (stat == "Negative") {
                     return "@sentNeg";
                 }
+                return stat;
             };
 
+            clearChildren("tbDictList");
             data.forEach(function(item) {
-                newEntry("tbDictList", item.dictExpr, item.dictReplace, converter);
+                newEntry("tbDictList", item.expr, item.rep, postconverter, preconverter);
             });
         }
 
@@ -516,6 +628,7 @@
                 if (stat == "Negative") {
                     return "@sentNeg";
                 }
+                return stat;
             };
 
             if (term == "") {
@@ -525,7 +638,7 @@
             for (var i = 0; i < radios.length; i++) {
                 if (radios[i].checked == true) {
                     if (radios[i].id != "sentNone") {
-                        rep = radios[i].id == "sentPos" ? "Positive" : "Negative";
+                        rep = (radios[i].id == "sentPos") ? "Positive" : "Negative";
                     }
                 }
             }
@@ -571,8 +684,9 @@
             var clsName = document.getElementById("txtclsName").value;
 
             // get category
-            var cat = document.getElementById("txtCategory").value;
-
+            var cat = document.getElementById("txtCategory");
+            var mainCatId = (cat.data_selected) ? cat.data_selected.mainCatId : "";
+            var mainCat = (cat.data_selected) ? cat.data_selected.mainCatName : "";
             // get sql statement
             var sql = document.getElementById("sqlQry").value;
 
@@ -586,7 +700,8 @@
             var setting = {
                 ConfigName: configname,
                 ClassName: clsName,
-                Category: cat,
+                Category: mainCat,
+                CategoryId: mainCatId,
                 SQLQuery: sql,
                 PushToKB: pushtokb,
                 IsSentiment: idxSenti,
@@ -594,12 +709,96 @@
                 DomainId: domid,
                 DictTerm: dict,
                 RegExp: regex
-            }
+            };
 
             var strSetting = JSON.stringify(setting);
             // server method
-            var sc = #server( % BI.iKnow.TextIndexer.SaveSetting(strSetting))#;
+            console.log(strSetting);
+            //var sc = #server(%BI.iKnow.TextIndexer.SaveSetting(strSetting))#;
 
+        }
+
+        function loadSetting(settingId) {
+            var data = {
+                "Category": "All User",
+                "CategoryId": 10431,
+                "ClassName": "BTest.TestChild",
+                "ConfigName": null,
+                "DictTerm": [{
+                    "expr": "asdasd",
+                    "rep": null
+                }, {
+                    "expr": "happy",
+                    "rep": "@sentPos"
+                }, {
+                    "expr": "sad",
+                    "rep": "@sentNeg"
+                }],
+                "DomainId": 11,
+                "IsSentiment": 0,
+                "PushToKB": 1,
+                "RegExp": [{
+                    "expr": "aads",
+                    "rep": "asdasd"
+                }],
+                "SQLQuery": "SELECT * FROM BTest.TestChild",
+                "SelectedProperty": [{
+                    "indexAs": "c",
+                    "name": "PostDate",
+                    "type": "%Date"
+                }, {
+                    "indexAs": "t",
+                    "name": "PostTime",
+                    "type": "%Time"
+                }, {
+                    "indexAs": "p",
+                    "name": "Tweet",
+                    "type": "%String"
+                }]
+            };
+
+            // set configuration name
+            var configname = document.getElementById("txtConfigName");
+            configname.value = data.ConfigName;
+
+            // get category
+            var cat = document.getElementById("txtCategory");
+            cat.value = data.Category;
+
+            // set sql statement
+            var sql = document.getElementById("sqlQry");
+            sql.value = data.SQLQuery;
+
+            // set push to kb
+            var pushtokb = document.getElementById("chkToKM");
+            if (data.PushToKB) {
+                pushtokb.checked = true;
+            }
+
+            // set index sentiment
+            var idxSenti = document.getElementById("chkforSenti");
+            if (data.IsSentiment) {
+                idxSenti.checked = true;
+            }
+
+            // set classname
+            var clsName = document.getElementById("txtclsName");
+            clsName.value = data.ClassName;
+            loadClass(data.ClassName);
+
+            // get selected property
+            loadSelectedProp(data.ClassName, data.SelectedProperty);
+
+            // set input dict
+            loadDict(data.DictTerm);
+
+            // set input regex
+            loadExpr(data.RegExp);
+
+            // set domain id
+            var selDom = document.getElementById("domainSel");
+            selDom.value = data.DomainId;
+            loadDomainDetail();
         }
     </script>
     <link rel=stylesheet type="text/css" href="css/rptStyle.css">
@@ -668,6 +867,10 @@
         button.catBtn {
             width: 100px;
         }
+        
+        div.catLbl {
+            padding-top: 2px;
+        }
     </style>
 </head>
 
@@ -733,7 +936,7 @@
                                                     </td>
                                                     <td>
                                                         <input id="txtclsName" type="text" class="txtField" style="width:250px" />
-                                                        <button class="button" onclick="showDB()">Database</button>
+                                                        <button class="button catBtn" onclick="showDB()">Database</button>
                                                     </td>
                                                     <td>
                                                         <input type="checkbox" id="chkToKM" checked/><label for="chkToKM">Push to Knowledge Base</label>
@@ -745,6 +948,7 @@
                                                     </td>
                                                     <td>
                                                         <input type="text" id="txtCategory" class="txtField" style="width:250px;" />
+                                                        <button class="button catBtn" onclick="showCategory('main')">Category</button>
                                                     </td>
                                                     <td>
                                                         <input type="checkbox" id="chkforSenti" /><label for="chkforSenti">Index As Sentiment</label>
@@ -770,7 +974,7 @@
                                                         <td>Property Name</td>
                                                         <td>Type</td>
                                                         <td style="width:50px">Index As</td>
-                                                        <td style="width:10%;">Add. Option</td>
+                                                        <!-- <td style="width:10%;">Add. Option</td> -->
                                                     </tr>
                                                 </thead>
                                                 <tbody id="propSelection">
@@ -782,7 +986,7 @@
                                 <tr>
                                     <td style="height:30px">
                                         <div style="float:right;padding-right:10px;">
-                                            <button class="button" onclick=getSelectedProp()>Get Prop</button>
+                                            <button class="button" onclick=loadSetting()>Get Prop</button>
                                             <button class="button">Clear</button>
                                             <button class="button">New</button>
                                             <button class="button">Next</button>
@@ -937,7 +1141,7 @@
                                                                 <td style="vertical-align: middle">Type:</td>
                                                                 <td style="vertical-align: middle">
                                                                     <div>
-                                                                        <input type="radio" name="sentiment" id="sentNone" value="none" onclick="toggleRep()" checked/><label for="sentNone">None</label>
+                                                                        <input type="radio" name="sentiment" id="sentNone" value="none" onclick="toggleRep()" checked/><label for="sentNone">Replacement</label>
                                                                         <input type="radio" name="sentiment" id="sentPos" value="p" onclick="toggleRep()" /><label for="sentPos">Positive</label>
                                                                         <input type="radio" name="sentiment" id="sentNeg" value="n" onclick="toggleRep()" /><label for="sentNeg">Negative</label>
                                                                     </div>

@@ -8,6 +8,7 @@
     <title> Text Indexer </title>
     <script type="text/javascript" src="js/tab.js"></script>
     <script type="text/javascript" src="js/ImageMenu.js"></script>
+    <script type="text/javascript" SRC="js/main.js"></script>
     <script type="text/javascript">
         function showCategory(type, id, selectedValue) {
             var mainCat = document.getElementById("txtCategory"),
@@ -104,19 +105,22 @@
         function loadClass(selectedClass) {
             var fetchClass = function(clsName) {
                 // run server method here
-                return [{
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "name": "Tweet",
-                    "type": "%String"
-                }, {
-                    "name": "TweetID",
-                    "type": "%String"
-                }];
+                // var jsonStr = #server(%BI.iKnow.TextIndexer.LoadSelectedClass(clsName))#;
+                return JSON.parse(jsonStr);
+
+                //                return [{
+                //                    "name": "PostDate",
+                //                    "type": "%Date"
+                //                }, {
+                //                    "name": "PostTime",
+                //                    "type": "%Time"
+                //                }, {
+                //                    "name": "Tweet",
+                //                    "type": "%String"
+                //                }, {
+                //                    "name": "TweetID",
+                //                    "type": "%String"
+                //                }];
             };
 
             var clearTab = function() {
@@ -384,13 +388,15 @@
 
         function loadDomainList() {
             var domDropDown = document.getElementById("domainSel");
-            var data = [{
-                "domId": 1,
-                "domName": "iKnowSample"
-            }, {
-                "domId": 11,
-                "domName": "KM"
-            }];
+            // var jsonStr = #server(%BI.iKnow.iKnow.ListDomains())#;
+            var data = JSON.parse(jsonStr);
+            //            var data = [{
+            //                "domId": 1,
+            //                "domName": "iKnowSample"
+            //            }, {
+            //                "domId": 11,
+            //                "domName": "KM"
+            //            }];
 
             data.forEach(function(domain) {
                 var option = document.createElement("option");
@@ -407,48 +413,51 @@
                 return;
             }
 
-            var data = {
-                "domName": "KM",
-                "entCnt": 13561,
-                "metadata": [{
-                    "dataType": "DATE",
-                    "fId": 1,
-                    "fName": "DateIndexed",
-                    "ops": "=,!=,<,<=,>,>="
-                }, {
-                    "dataType": "STRING",
-                    "fId": 2,
-                    "fName": "PostId",
-                    "ops": "=,!="
-                }, {
-                    "dataType": "STRING",
-                    "fId": 3,
-                    "fName": "AttachmentId",
-                    "ops": "=,!="
-                }, {
-                    "dataType": "STRING",
-                    "fId": 4,
-                    "fName": "Type",
-                    "ops": "=,!="
-                }, {
-                    "dataType": "NUMBER",
-                    "fId": 5,
-                    "fName": "CategoryId",
-                    "ops": "=,!="
-                }, {
-                    "dataType": "DATE",
-                    "fId": 6,
-                    "fName": "PostDate",
-                    "ops": "=,!=,>,<,<=,>="
-                }, {
-                    "dataType": "NUMBER",
-                    "fId": 7,
-                    "fName": "TotalSentiment",
-                    "ops": "=,!=,>,<,<=,>="
-                }],
-                "sentCnt": 4392,
-                "srcCnt": 586
-            }
+            // var jsonStr = #server(%BI.iKnow.TextIndexer.LoadSelectedDomain(val))#;
+            var data = JSON.parse(jsonStr);
+
+            //            var data = {
+            //                "domName": "KM",
+            //                "entCnt": 13561,
+            //                "metadata": [{
+            //                    "dataType": "DATE",
+            //                    "fId": 1,
+            //                    "fName": "DateIndexed",
+            //                    "ops": "=,!=,<,<=,>,>="
+            //                }, {
+            //                    "dataType": "STRING",
+            //                    "fId": 2,
+            //                    "fName": "PostId",
+            //                    "ops": "=,!="
+            //                }, {
+            //                    "dataType": "STRING",
+            //                    "fId": 3,
+            //                    "fName": "AttachmentId",
+            //                    "ops": "=,!="
+            //                }, {
+            //                    "dataType": "STRING",
+            //                    "fId": 4,
+            //                    "fName": "Type",
+            //                    "ops": "=,!="
+            //                }, {
+            //                    "dataType": "NUMBER",
+            //                    "fId": 5,
+            //                    "fName": "CategoryId",
+            //                    "ops": "=,!="
+            //                }, {
+            //                    "dataType": "DATE",
+            //                    "fId": 6,
+            //                    "fName": "PostDate",
+            //                    "ops": "=,!=,>,<,<=,>="
+            //                }, {
+            //                    "dataType": "NUMBER",
+            //                    "fId": 7,
+            //                    "fName": "TotalSentiment",
+            //                    "ops": "=,!=,>,<,<=,>="
+            //                }],
+            //                "sentCnt": 4392,
+            //                "srcCnt": 586
+            //            }
 
             var domName = document.getElementById("txtDomName");
             var srcCnt = document.getElementById("txtSrcCnt");
@@ -663,6 +672,22 @@
             getExpr("tbDictList");
         }
 
+        function loadDefSent() {
+            var disableInput = function(enable) {
+                var tableToDisable = ["tabDictEntry", "tabDictList"];
+                tableToDisable.forEach(function(tbl) {
+                    var currTab = document.getElementById(tbl);
+                    var inputs = currTab.getElementsByTagName("input");
+                    for (var i = 0; i < inputs.length; i++) {
+                        inputs[i].disabled = (enable) ? true : false;
+                    }
+                });
+            };
+
+            var chk = document.getElementById("chkDefSent");
+            disableInput(chk.checked);
+        }
+
         function saveSetting() {
             // get configname
             var configname = document.getElementById("txtConfigName").value;
@@ -694,7 +719,10 @@
             var pushtokb = document.getElementById("chkToKM").checked;
 
             // get index sentiment
-            var idxSenti = document.getElementById("chkforSenti").checked;
+            // var idxSenti = document.getElementById("chkforSenti").checked;
+
+            // use default sentiment
+            var UseDefSent = document.getElementById("chkDefSent").checked;
 
             // combine all setting
             var setting = {
@@ -704,7 +732,7 @@
                 CategoryId: mainCatId,
                 SQLQuery: sql,
                 PushToKB: pushtokb,
-                IsSentiment: idxSenti,
+                UseDefaultDict: UseDefSent,
                 SelectedProperty: selectedProp,
                 DomainId: domid,
                 DictTerm: dict,
@@ -713,49 +741,53 @@
 
             var strSetting = JSON.stringify(setting);
             // server method
-            console.log(strSetting);
-            //var sc = #server(%BI.iKnow.TextIndexer.SaveSetting(strSetting))#;
+            // console.log(strSetting);
+            var id = 1;
+            // var sc = #server(%BI.iKnow.TextIndexer.SaveSetting(id, strSetting))#;
 
         }
 
         function loadSetting(settingId) {
-            var data = {
-                "Category": "All User",
-                "CategoryId": 10431,
-                "ClassName": "BTest.TestChild",
-                "ConfigName": null,
-                "DictTerm": [{
-                    "expr": "asdasd",
-                    "rep": null
-                }, {
-                    "expr": "happy",
-                    "rep": "@sentPos"
-                }, {
-                    "expr": "sad",
-                    "rep": "@sentNeg"
-                }],
-                "DomainId": 11,
-                "IsSentiment": 0,
-                "PushToKB": 1,
-                "RegExp": [{
-                    "expr": "aads",
-                    "rep": "asdasd"
-                }],
-                "SQLQuery": "SELECT * FROM BTest.TestChild",
-                "SelectedProperty": [{
-                    "indexAs": "c",
-                    "name": "PostDate",
-                    "type": "%Date"
-                }, {
-                    "indexAs": "t",
-                    "name": "PostTime",
-                    "type": "%Time"
-                }, {
-                    "indexAs": "p",
-                    "name": "Tweet",
-                    "type": "%String"
-                }]
-            };
+            var settingId = settingId || 1;
+            // var jsonStr = #server(%BI.iKnow.TextIndexer.LoadSetting(settingId))#;
+            var data = JSON.parse(jsonStr);
+            //            var data = {
+            //                "Category": "All User",
+            //                "CategoryId": 10431,
+            //                "ClassName": "BTest.TestChild",
+            //                "ConfigName": null,
+            //                "DictTerm": [{
+            //                    "expr": "asdasd",
+            //                    "rep": null
+            //                }, {
+            //                    "expr": "happy",
+            //                    "rep": "@sentPos"
+            //                }, {
+            //                    "expr": "sad",
+            //                    "rep": "@sentNeg"
+            //                }],
+            //                "DomainId": 11,
+            //                "IsSentiment": 0,
+            //                "PushToKB": 1,
+            //                "RegExp": [{
+            //                    "expr": "aads",
+            //                    "rep": "asdasd"
+            //                }],
+            //                "SQLQuery": "SELECT * FROM BTest.TestChild",
+            //                "SelectedProperty": [{
+            //                    "indexAs": "c",
+            //                    "name": "PostDate",
+            //                    "type": "%Date"
+            //                }, {
+            //                    "indexAs": "t",
+            //                    "name": "PostTime",
+            //                    "type": "%Time"
+            //                }, {
+            //                    "indexAs": "p",
+            //                    "name": "Tweet",
+            //                    "type": "%String"
+            //                }]
+            //            };
 
             // set configuration name
             var configname = document.getElementById("txtConfigName");
@@ -764,6 +796,10 @@
             // get category
             var cat = document.getElementById("txtCategory");
             cat.value = data.Category;
+            cat.data_selected = {
+                mainCatId: data.CategoryId,
+                mainCat: data.Category
+            };
 
             // set sql statement
             var sql = document.getElementById("sqlQry");
@@ -776,10 +812,10 @@
             }
 
             // set index sentiment
-            var idxSenti = document.getElementById("chkforSenti");
-            if (data.IsSentiment) {
-                idxSenti.checked = true;
-            }
+            // var idxSenti = document.getElementById("chkforSenti");
+            // if (data.IsSentiment) {
+            //     idxSenti.checked = true;
+            // }
 
             // set classname
             var clsName = document.getElementById("txtclsName");
@@ -792,6 +828,13 @@
             // set input dict
             loadDict(data.DictTerm);
 
+            // Disable area for default sentiment
+            var chkUseDefSent = document.getElementById("chkDefSent");
+            if (data.UseDefaultDict) {
+                chkUseDefSent.checked = true;
+            }
+            loadDefSent();
+
             // set input regex
             loadExpr(data.RegExp);
 
@@ -799,6 +842,89 @@
             var selDom = document.getElementById("domainSel");
             selDom.value = data.DomainId;
             loadDomainDetail();
+        }
+
+        // Usage for the folder.
+        var currConfigId = "",
+            currFolderId = "";
+
+        function showFolder() {
+            var sRtn, elTarget = "txtFolder",
+                elTargetObj, passVal = "",
+                nm = 64;
+            // #server(%BI.WebMain2.setpivToo(nm))#;
+            if (nm == 4) {
+                if (inp1.substring(0, 1) != "s") {
+                    passVal = 1 + dlC2 + inp1 + dlC2;
+                } else {
+                    passVal = inp1;
+                }
+            } else if (nm == 7) {
+                passVal = 1 + dlC2 + inp2 + dlC2;
+            } else {}
+            elTargetObj = document.getElementById(elTarget);
+            if (currFolderId != "") {
+                passVal = dlC2 + cFoldid + dlC2;
+            }
+
+            var top = (document.body.clientHeight / 2 - 200);
+            var left = (document.body.clientWidth / 2 - 225);
+            var param = {
+                link: "%25cspapp.bi.pivotlist.cls?&sFolder=" + passVal,
+                callBackFunc: "setDashboard",
+                parameters: nm + dlC3 + elTarget,
+                width: "550",
+                height: "400",
+                windowParam: "toolbar='no', menubar='no', resizable='yes', status='no', scrollbars='no', fullscreen='no', top=" + top + ", left=" + left + ""
+            };
+
+            openWin(param);
+        }
+
+        function openWin(r) {
+            if (speedModalDialog && typeof speedModalDialog === "function" && r) {
+                speedModalDialog(r.link, r.callBackFunc, r.parameters, r.width, r.height, r.windowParam);
+            }
+        }
+
+
+        function setDashboard(sRtn, paramObj) {
+            var sRtnVal, cFold, yesCtn, inp1, dID;
+            var nm = paramObj.split(dlC3)[0],
+                elTarget = paramObj.split(dlC3)[1];
+
+            var elTargetObj = document.getElementById(elTarget);
+            if ((sRtn != "") && (sRtn != null)) {
+                sRtnVal = sRtn.split("|");
+                if (nm == 0) {
+                    cFold = sRtnVal[0].split(dlC2);
+                    cFoldid = cFold[1];
+                    elTargetObj.value = sRtnVal[1];
+                } else if (nm == 4) {
+                    if (sRtn != "@*") {
+                        yesCtn = sRtnVal[0].substring(0, 1);
+                        if (yesCtn == "s") {
+                            inp1 = sRtnVal[0];
+                            elTargetObj.value = sRtnVal[1];
+                        } else {
+                            dID = sRtnVal[0].split(dlC2);
+                            elTargetObj.value = sRtnVal[1];
+                            if (nm == 4) {
+                                inp1 = dID[1];
+                            }
+                        }
+                        setWorkFlowObjProp(1, inp1);
+                    }
+                } else if (nm = 64) {
+                    console.log(sRtn, paramObj);
+
+                } else {
+                    cFold = sRtnVal[0].split(dlC2);
+                    elTargetObj.value = sRtnVal[1];
+                    setWorkFlowObjProp(11, cFold[1]);
+                    insp1.disabled = insp2.disabled = insp3.disabled = insp4.disabled = true;
+                }
+            }
         }
     </script>
     <link rel=stylesheet type="text/css" href="css/rptStyle.css">
@@ -871,6 +997,10 @@
         div.catLbl {
             padding-top: 2px;
         }
+        
+        .req {
+            color: red;
+        }
     </style>
 </head>
 
@@ -885,8 +1015,9 @@
                     <table cellpadding="0" cellspacing="0">
                         <tr>
                             <td class="imgMenu"><img alt="New" src="img/anzIco/new.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)"></td>
-                            <td class="imgMenu"><img alt="Open" src="img/anzIco/open.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)"></td>
-                            <td class="imgMenu"><img alt="Save" src="img/anzIco/save1.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting()"></td>
+                            <td class="imgMenu"><img alt="Open" src="img/anzIco/open.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="showFolder()"></td>
+                            <td class="imgMenu"><img alt="Save" src="img/anzIco/save1.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(1)"></td>
+                            <td class="imgMenu"><img alt="Save As" src="img/reporter/saveas.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(0)"></td>
                         </tr>
                     </table>
                 </td>
@@ -924,21 +1055,26 @@
                                             <table cellpadding="5" cellspacing="0">
                                                 <tr>
                                                     <td>
-                                                        <span class="inputLabel">Configuration Name:</span>
+                                                        <span class="inputLabel">Configuration Name<span class="req">*</span>:</span>
                                                     </td>
                                                     <td>
                                                         <input type="text" name="txtConfigName" id="txtConfigName" class="txtField" style="width:250px" />
                                                     </td>
+                                                    <td>Folder<span class="req">*</span>:</td>
+                                                    <td>
+                                                        <input type="text" name="txtFolder" id="txtFolder" class="txtField">
+                                                        <button onclick="showFolder()" class="button">Folder</button>
+                                                    </td>
                                                 </tr>
                                                 <tr>
                                                     <td>
-                                                        <span class="inputLabel">Class:</span>
+                                                        <span class="inputLabel">Class<span class="req">*</span>:</span>
                                                     </td>
                                                     <td>
                                                         <input id="txtclsName" type="text" class="txtField" style="width:250px" />
                                                         <button class="button catBtn" onclick="showDB()">Database</button>
                                                     </td>
-                                                    <td>
+                                                    <td colspan="2">
                                                         <input type="checkbox" id="chkToKM" checked/><label for="chkToKM">Push to Knowledge Base</label>
                                                     </td>
                                                 </tr>
@@ -950,13 +1086,13 @@
                                                         <input type="text" id="txtCategory" class="txtField" style="width:250px;" />
                                                         <button class="button catBtn" onclick="showCategory('main')">Category</button>
                                                     </td>
-                                                    <td>
-                                                        <input type="checkbox" id="chkforSenti" /><label for="chkforSenti">Index As Sentiment</label>
+                                                    <td colspan="2">
+                                                        <!-- <input type="checkbox" id="chkforSenti" /><label for="chkforSenti">Index As Sentiment</label> -->
                                                     </td>
                                                 </tr>
                                                 <tr>
                                                     <td>SQL Query:</td>
-                                                    <td colspan="2">
+                                                    <td colspan="3">
                                                         <textarea name="sqlText" id="sqlQry" cols="30" rows="5" style="width: 99%;"></textarea>
                                                     </td>
                                                 </tr>
@@ -1125,14 +1261,14 @@
                                                     <td style="height:30px;">User Dictionary</td>
                                                     <td>
                                                         <div style="float:right;padding-right: 5px;">
-                                                            <input id="chkDefSent" type="checkbox" value="defSent" />
+                                                            <input type="checkbox" name="defSent" id="chkDefSent" onclick="loadDefSent()">
                                                             <label for="chkDefSent">Use Default Sentiment</label>
                                                         </div>
                                                     </td>
                                                 </tr>
                                                 <tr>
                                                     <td colspan="2" style="height:150px;">
-                                                        <table class="fullSize" cellpadding="0" cellspacing="0">
+                                                        <table class="fullSize" cellpadding="0" cellspacing="0" id="tabDictEntry">
                                                             <tr>
                                                                 <td style="width: 10%;">Term:</td>
                                                                 <td><input type="text" name="txtDictOri" id="txtDictOri" class="txtField" style="width: 99%;" /></td>
@@ -1161,7 +1297,7 @@
                                                 <tr>
                                                     <td colspan="2" style="height:100%">
                                                         <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;padding:3px;">
-                                                            <table class="tblGrid" cellpadding="2" cellspacing="0" style="position:absolute;top:0px;left:0px;width: 100%;">
+                                                            <table id="tabDictList" class="tblGrid" cellpadding="2" cellspacing="0" style="position:absolute;top:0px;left:0px;width: 100%;">
                                                                 <thead>
                                                                     <tr class="titleBar">
                                                                         <td style="width:1%">No.</td>

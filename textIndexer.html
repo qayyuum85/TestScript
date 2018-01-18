@@ -688,7 +688,7 @@
             disableInput(chk.checked);
         }
 
-        function saveSetting() {
+        function saveSetting(saveAs) {
             // get configname
             var configname = document.getElementById("txtConfigName").value;
 
@@ -712,6 +712,7 @@
             var cat = document.getElementById("txtCategory");
             var mainCatId = (cat.data_selected) ? cat.data_selected.mainCatId : "";
             var mainCat = (cat.data_selected) ? cat.data_selected.mainCatName : "";
+
             // get sql statement
             var sql = document.getElementById("sqlQry").value;
 
@@ -723,6 +724,15 @@
 
             // use default sentiment
             var UseDefSent = document.getElementById("chkDefSent").checked;
+
+            var folder = "";
+            var folderObj = document.getElementById("txtFolder");
+            if (typeof(folderObj.data_selected) != "undefined") {
+                folder = folderObj.data_selected.id;
+            } else {
+                alert("Please select a folder.");
+                return;
+            }
 
             // combine all setting
             var setting = {
@@ -736,19 +746,33 @@
                 SelectedProperty: selectedProp,
                 DomainId: domid,
                 DictTerm: dict,
-                RegExp: regex
+                RegExp: regex,
+                Folder: folder
             };
 
             var strSetting = JSON.stringify(setting);
             // server method
             // console.log(strSetting);
-            var id = 1;
-            // var sc = #server(%BI.iKnow.TextIndexer.SaveSetting(id, strSetting))#;
 
+            var currId = (saveAs) ? 0 : configId.getId();
+            // var sc = #server(%BI.iKnow.TextIndexer.SaveSetting(currId, strSetting))#;
+            if (sc == 0) {
+                alert("Unable to save setting due to error.");
+                return 0;
+            }
+
+            // set saved configuration id to page
+            configId.setId(sc);
+            alert("Setting saved.");
+            return 1;
         }
 
-        function loadSetting(settingId) {
-            var settingId = settingId || 1;
+        function openSetting() {
+            openPivot(64, "");
+        }
+
+        function loadSetting() {
+            var settingId = configId.getId();
             // var jsonStr = #server(%BI.iKnow.TextIndexer.LoadSetting(settingId))#;
             var data = JSON.parse(jsonStr);
             //            var data = {
@@ -798,12 +822,19 @@
             cat.value = data.Category;
             cat.data_selected = {
                 mainCatId: data.CategoryId,
-                mainCat: data.Category
+                mainCatName: data.Category
             };
 
             // set sql statement
             var sql = document.getElementById("sqlQry");
             sql.value = data.SQLQuery;
+
+            var folderObj = document.getElementById("txtFolder");
+            folderObj.data_selected = {
+                id: data.Folder.id,
+                name: data.Folder.name
+            };
+            folderObj.value = data.Folder.name;
 
             // set push to kb
             var pushtokb = document.getElementById("chkToKM");
@@ -842,37 +873,51 @@
             var selDom = document.getElementById("domainSel");
             selDom.value = data.DomainId;
             loadDomainDetail();
+
+            // update data to log
+            if (data.LastLog != null) {
+                populateLog(data.LastLog);
+            }
         }
 
         // Usage for the folder.
-        var currConfigId = "",
-            currFolderId = "";
+        var configId = function() {
+            var currId = 0;
+
+            var setId = function(val) {
+                currId = val;
+            };
+            var getId = function() {
+                return currId;
+            };
+
+            return {
+                setId: setId,
+                getId: getId
+            };
+        }();
 
         function showFolder() {
-            var sRtn, elTarget = "txtFolder",
-                elTargetObj, passVal = "",
-                nm = 64;
+            openPivot(0, "txtFolder");
+        }
+
+        function openPivot(nm, target) {
+            var sRtn, el, passVal = "",
+                nm = nm;
             // #server(%BI.WebMain2.setpivToo(nm))#;
-            if (nm == 4) {
-                if (inp1.substring(0, 1) != "s") {
-                    passVal = 1 + dlC2 + inp1 + dlC2;
-                } else {
-                    passVal = inp1;
+            if (nm == 0) {
+                el = document.getElementById(target);
+                if (typeof(el.data_selected) != "undefined") {
+                    passVal = dlC2 + el.data_selected.id + dlC2;
                 }
-            } else if (nm == 7) {
-                passVal = 1 + dlC2 + inp2 + dlC2;
-            } else {}
-            elTargetObj = document.getElementById(elTarget);
-            if (currFolderId != "") {
-                passVal = dlC2 + cFoldid + dlC2;
             }
 
             var top = (document.body.clientHeight / 2 - 200);
             var left = (document.body.clientWidth / 2 - 225);
             var param = {
                 link: "%25cspapp.bi.pivotlist.cls?&sFolder=" + passVal,
-                callBackFunc: "setDashboard",
-                parameters: nm + dlC3 + elTarget,
+                callBackFunc: "setSelectedPivot",
+                parameters: nm + dlC3 + target,
                 width: "550",
                 height: "400",
                 windowParam: "toolbar='no', menubar='no', resizable='yes', status='no', scrollbars='no', fullscreen='no', top=" + top + ", left=" + left + ""
@@ -887,9 +932,8 @@
             }
         }
 
-
-        function setDashboard(sRtn, paramObj) {
-            var sRtnVal, cFold, yesCtn, inp1, dID;
+        function setSelectedPivot(sRtn, paramObj) {
+            var sRtnVal, cFold;
             var nm = paramObj.split(dlC3)[0],
                 elTarget = paramObj.split(dlC3)[1];
 
@@ -898,31 +942,109 @@
                 sRtnVal = sRtn.split("|");
                 if (nm == 0) {
                     cFold = sRtnVal[0].split(dlC2);
-                    cFoldid = cFold[1];
+                    elTargetObj.data_selected = {
+                        id: cFold[1],
+                        name: sRtnVal[1]
+                    };
                     elTargetObj.value = sRtnVal[1];
-                } else if (nm == 4) {
-                    if (sRtn != "@*") {
-                        yesCtn = sRtnVal[0].substring(0, 1);
-                        if (yesCtn == "s") {
-                            inp1 = sRtnVal[0];
-                            elTargetObj.value = sRtnVal[1];
-                        } else {
-                            dID = sRtnVal[0].split(dlC2);
-                            elTargetObj.value = sRtnVal[1];
-                            if (nm == 4) {
-                                inp1 = dID[1];
-                            }
-                        }
-                        setWorkFlowObjProp(1, inp1);
-                    }
                 } else if (nm = 64) {
-                    console.log(sRtn, paramObj);
-
-                } else {
                     cFold = sRtnVal[0].split(dlC2);
-                    elTargetObj.value = sRtnVal[1];
-                    setWorkFlowObjProp(11, cFold[1]);
-                    insp1.disabled = insp2.disabled = insp3.disabled = insp4.disabled = true;
+                    configId.setId(cFold[1]);
+                    loadSetting();
+                } else {
+                    // nothing here, move along
+                }
+            }
+        }
+
+        function newSetting() {
+            window.location.reload();
+        }
+
+        function loadData() {
+            var isSaved = 0;
+            if (configId.getId() == "") {
+                isSaved = saveSetting(1);
+            } else {
+                isSaved = saveSetting(0);
+            }
+
+            if (isSaved == 0) {
+                return;
+            }
+
+            // var runInBackground = document.getElementById("chkRunBackground").checked;
+            // var runBg = 0;
+            // if (runInBackground) {
+            //     runBg = 1;
+            // }
+            var settingId = configId.getId();
+            // var sc = #server(%BI.iKnow.TextIndexer.RunIndex(settingId))#;
+            var logArea = document.getElementById("divStatus");
+            var errLog, errLogStr = "",
+                sep = "";
+            if (sc != 1) {
+                errLogs = JSON.parse(sc);
+                errLogs.forEach(function(r, rIdx) {
+                    errLogStr += sep + r.errType + " " + "ERROR: " + " " + r.errDesc;
+                    sep = "<br />";
+                });
+                logArea.innerHTML = errLogStr;
+            }
+        }
+
+        function populateLog(str) {
+            var logArea = document.getElementById("divStatus");
+            var logStr = str.replace(/(?:\r|\n\|\r\n)/g, "<br />")
+            logArea.innerHTML = logStr;
+        }
+
+        function refreshLog() {
+            var settingId = configId.getId();
+            if (settingId == 0) {
+                return;
+            }
+
+            // var log = #server(%BI.iKnow.TextIndexer.UpdateLog(settingId))#;
+            populateLog(log);
+        }
+
+        var timeout = function() {
+            /**Timeout Management**/
+            var timeoutId = 0;
+            var setTheTimeout = function(f, interval) {
+                timeoutId = window.setTimeout(function() {
+                    f();
+                }, interval);
+            };
+
+            var clearTheTimeout = function() {
+                if (timeoutId != 0) {
+                    window.clearTimeout(timeoutId);
+                }
+            };
+
+            return {
+                set: setTheTimeout,
+                clear: clearTheTimeout
+            };
+        }();
+
+        function refreshLogByInterval() {
+            var logSwitches = document.getElementsByName("logSwitch");
+            var interval = document.getElementById("txtRefInterval").value;
+            if (interval <= 0 || interval == "" || isNaN(interval)) {
+                alert("Invalid interval.");
+            }
+            var currId;
+            for (var i = 0; i < logSwitches.length; i++) {
+                if (logSwitches[i].checked == true) {
+                    currId = logSwitches[i].id;
+                    if (currId == "rdOnLog") {
+                        timeout.set(refreshLog, (interval * 1000));
+                    } else {
+                        timeout.clear();
+                    }
                 }
             }
         }
@@ -1001,6 +1123,13 @@
         .req {
             color: red;
         }
+        
+        div#divStatus {
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: 100%;
+            width: 100%;
+        }
     </style>
 </head>
 
@@ -1014,10 +1143,10 @@
                 <td>
                     <table cellpadding="0" cellspacing="0">
                         <tr>
-                            <td class="imgMenu"><img alt="New" src="img/anzIco/new.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)"></td>
-                            <td class="imgMenu"><img alt="Open" src="img/anzIco/open.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="showFolder()"></td>
-                            <td class="imgMenu"><img alt="Save" src="img/anzIco/save1.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(1)"></td>
-                            <td class="imgMenu"><img alt="Save As" src="img/reporter/saveas.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(0)"></td>
+                            <td class="imgMenu"><img alt="New" src="img/anzIco/new.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="newSetting()"></td>
+                            <td class="imgMenu"><img alt="Open" src="img/anzIco/open.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="openSetting()"></td>
+                            <td class="imgMenu"><img alt="Save" src="img/anzIco/save1.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(0)"></td>
+                            <td class="imgMenu"><img alt="Save As" src="img/reporter/saveas.gif" onmouseover="ImgMenu(this,1)" onmouseout="ImgMenu(this,0)" onclick="saveSetting(1)"></td>
                         </tr>
                     </table>
                 </td>
@@ -1037,7 +1166,7 @@
                                 <div id="td3" class="tab" onclick="sTab('d3','d1,d2,d4')" onmouseover="mover(this)" onmouseout="mout(this)">Pre-Process</div>
                             </td>
                             <td>
-                                <div id="td4" class="tab" onclick="sTab('d4','d1,d2,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Review</div>
+                                <div id="td4" class="tab" onclick="sTab('d4','d1,d2,d3')" onmouseover="mover(this)" onmouseout="mout(this)">Status</div>
                             </td>
                         </tr>
                     </table>
@@ -1091,7 +1220,7 @@
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td>SQL Query:</td>
+                                                    <td>SQL Condition:</td>
                                                     <td colspan="3">
                                                         <textarea name="sqlText" id="sqlQry" cols="30" rows="5" style="width: 99%;"></textarea>
                                                     </td>
@@ -1119,16 +1248,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td style="height:30px">
-                                        <div style="float:right;padding-right:10px;">
-                                            <button class="button" onclick=loadSetting()>Get Prop</button>
-                                            <button class="button">Clear</button>
-                                            <button class="button">New</button>
-                                            <button class="button">Next</button>
-                                        </div>
-                                    </td>
-                                </tr>
                             </table>
                         </div>
 
@@ -1139,12 +1258,12 @@
                         <div id=d2 class="tabDiv fullSize">
                             <table class="fullSize" cellpadding="5" cellspacing="0">
                                 <tr>
-                                    <td>Domain</td>
+                                    <td style="width: 2%;">Domain</td>
                                     <td>
                                         <select id="domainSel" style="width:250px" onchange="loadDomainDetail();">
                                             <option value=""></option>
                                         </select>
-                                        <button class="button" onclick="createDomain()">Create</button>
+                                        <button class="button" onclick="createDomain()" style="display: none">Create</button>
                                     </td>
                                 </tr>
                                 <tr style="height: 100%;">
@@ -1170,7 +1289,7 @@
                                                 <tr>
                                                     <td>Metadata:</td>
                                                     <td>
-                                                        <table cellpadding="0" cellspacing="0">
+                                                        <table class="tblGrid" cellpadding="0" cellspacing="0">
                                                             <thead>
                                                                 <tr>
                                                                     <td class="idWidth">Id</td>
@@ -1184,15 +1303,6 @@
                                                     </td>
                                                 </tr>
                                             </table>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="height:30px;" colspan="2">
-                                        <div style="float:right;padding-right:10px;">
-                                            <button class="button">Clear</button>
-                                            <button class="button">New</button>
-                                            <button class="button">Next</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1315,16 +1425,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td style="height:30px" colspan="2">
-                                        <div style="float:right;padding-right:10px;">
-                                            <button class="button" onclick="getRegexDict()">Get Prop</button>
-                                            <button class="button">Clear</button>
-                                            <button class="button">New</button>
-                                            <button class="button">Next</button>
-                                        </div>
-                                    </td>
-                                </tr>
                             </table>
                         </div>
                         <!--
@@ -1335,17 +1435,32 @@
                         <div id="d4" class="tabDiv fullSize">
                             <table class="fullSize" cellpadding="5" cellspacing="0">
                                 <tr>
-                                    <td style="height:100%;">
-
+                                    <td style="height: 30px">
+                                        <button class="button" onclick="loadData()">Load Data</button>
+                                        <!-- <input type="checkbox" id="chkRunBackground" /><label for="chkRunBackground">Run in background</label> -->
+                                        <button class="button" onclick="refreshLog()">Refresh</button>
+                                        <span>Refresh Interval:</span>
+                                        <input type="radio" name="logSwitch" id="rdOnLog" onclick="refreshLogByInterval()"><label for="rdOnLog">on</label>
+                                        <input type="radio" name="logSwitch" id="rdOffLog" onclick="refreshLogByInterval()" checked><label for="rdOffLog">off</label>
+                                        <input type="text" class="txtField" name="txtRefInterval" id="txtRefInterval" value="10" /><span>&nbsp;&nbsp;s</span>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="height:30px">
-                                        <div style="float:right;padding-right:10px;">
-                                            <button class="button">Clear</button>
-                                            <button class="button">New</button>
-                                            <button class="button">Next</button>
-                                        </div>
+                                    <td style="height:100%;">
+                                        <table class="tblGrid" style="height:100%" cellpadding="0" cellspacing="0">
+                                            <thead>
+                                                <tr>
+                                                    <td>Status</td>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>
+                                                        <div id="divStatus"></div>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </td>
                                 </tr>
                             </table>

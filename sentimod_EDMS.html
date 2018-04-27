@@ -1,0 +1,1311 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta http-equiv="X-UA-Compatible" charset="UTF-8" content="IE=edge">
+    <!--JS START-->
+    <script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+    <script type="text/javascript" src="js/es5shims.js"></script>
+    <script type="text/javascript" src="js/jqcloud-1.0.4.min.js"></script>
+    <script type="text/javascript" src="js/iknow/qTreeBuilder.js"></script>
+    <script type="text/javascript" src="js/tab.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+    <script type="text/javascript" src="js/crossbrowser.js"></script>
+    <!--script type="text/javascript" src="js/chart.js"></script-->
+    <script type="text/javascript" src="js/chartannote.js"></script>
+
+    <script type="text/javascript">
+        var displayType, analysisModeOn;
+
+        function extend(o, p) {
+            for (prop in p) { // For all props in p.
+                o[prop] = p[prop]; // Add the property to o.
+            }
+            return o;
+        }
+
+        /*Filters*/
+        function getFilters() {
+            var keyword = document.getElementById("txtKeyword").value,
+                dtFrom = document.getElementById("txtDateFrm").value,
+                dtTo = document.getElementById("txtDateTo").value;
+            thisCat = getSelectedValue("ddMainCat");
+
+            var mainCat, subCat;
+            if (thisCat != "" && thisCat.split("||")[0] == "m") {
+                mainCat = thisCat.split("||")[1];
+                subCat = "";
+            } else if (thisCat != "" && thisCat.split("||")[0] == "s") {
+                subCat = thisCat.split("||")[1];
+                mainCat = "";
+            } else {
+                mainCat = "", subCat = "";
+            }
+
+            var ret = {};
+            if (keyword != "") {
+                ret["keyword"] = keyword;
+            }
+            if (dtFrom != "") {
+                ret["dateFrom"] = dtFrom;
+            }
+            if (dtTo != "") {
+                ret["dateTo"] = dtTo;
+            }
+            if (mainCat != "") {
+                ret["mainCat"] = mainCat;
+            }
+            if (subCat != "") {
+                ret["subCat"] = subCat;
+            }
+
+            return ret;
+        };
+
+
+        function genResult(obj) {
+            var data = obj;
+            var filters = getFilters();
+
+            var summary = function genSummary(r) {
+                var posCell = document.getElementById("cntSPos");
+                var negCell = document.getElementById("cntSNeg");
+                var neuCell = document.getElementById("cntSNeu");
+
+                posCell.innerHTML = r.positive.toString();
+                posCell.onclick = function pcClick() {
+                    var param = {
+                        "type": "overall",
+                        "sentiment": "positive"
+                    };
+                    param = extend(param, filters);
+
+                    return function() {
+                        clickH(param);
+                    };
+                }();
+
+                negCell.innerHTML = r.negative.toString();
+                negCell.onclick = function ncClick() {
+                    var param = {
+                        "type": "overall",
+                        "sentiment": "negative"
+                    };
+                    param = extend(param, filters);
+                    return function() {
+                        clickH(param);
+                    };
+                }();
+
+                neuCell.innerHTML = r.neutral.toString();
+                neuCell.onclick = function neucClick() {
+                    var param = {
+                        "type": "overall",
+                        "sentiment": "neutral"
+                    };
+                    param = extend(param, filters);
+                    return function() {
+                        clickH(param);
+                    };
+                }();
+
+            };
+            var trendingOld = function genTrendingOld(r) {
+                // Not used anymore, since column is now fixed
+                var lblCol = function createColTitle(tabElem, idx) {
+                    var cell = tabElem.insertCell(-1);
+                    if (idx == 0) { // table header
+                        cell.innerHTML = "";
+                    } else if (idx == 1) { // Positive value
+                        cell.innerHTML = "Positive";
+                    } else if (idx == 2) { // Neutral value
+                        cell.innerHTML = "Neutral";
+                    } else { // Negative value
+                        cell.innerHTML = "Negative";
+                    }
+                    cell.className = "tdHead";
+                };
+
+                var sbResize = function resizeforScrollBar() {
+                    var elem = document.getElementById("tabTrendCont");
+
+                    // get scrollbar height
+                    // credit to http://www.alexandre-gomes.com/?p=115
+                    var scrollbarDimension = function getscrollbarDimension() {
+                        var inner = document.createElement('p');
+                        inner.style.width = "100%";
+                        inner.style.height = "100%";
+
+                        var outer = document.createElement('div');
+                        outer.style.position = "absolute";
+                        outer.style.top = "0px";
+                        outer.style.left = "0px";
+                        outer.style.visibility = "hidden";
+                        outer.style.width = "100px";
+                        outer.style.height = "100px";
+                        outer.style.overflow = "hidden";
+                        outer.appendChild(inner);
+
+                        document.body.appendChild(outer);
+
+                        var w1 = inner.offsetWidth;
+                        var h1 = inner.offsetHeight;
+                        outer.style.overflow = 'scroll';
+                        var w2 = inner.offsetWidth;
+                        var h2 = inner.offsetHeight;
+                        if (w1 == w2) w2 = outer.clientWidth;
+                        if (h1 == h2) h2 = outer.clientHeight;
+
+                        document.body.removeChild(outer);
+
+                        return [(w1 - w2), (h1 - h2)];
+                    };
+
+                    //detect scrollbar exist
+                    var isScrollbarExist = function checkScrollbar() {
+                        var isVerticalScrollbar = elem.scrollHeight > elem.clientHeight;
+                        var isHorizontalScrollbar = elem.scrollWidth > elem.clientWidth;
+                        return {
+                            "h": isHorizontalScrollbar,
+                            "v": isVerticalScrollbar
+                        };
+                    };
+
+                    //add height to elem and additional tr for fixed column
+                    var tab = document.getElementById("tabTrend");
+                    var scrollbarStatus = isScrollbarExist();
+                    if (scrollbarStatus.h) {
+                        var scrollDim = scrollbarDimension();
+                        var scrollH = scrollDim[1];
+
+                        var currH = elem.scrollHeight;
+                        var newH = currH + scrollH - 1;
+                        elem.style.height = newH + "px";
+
+                        // To fix weird extra cell caused by css table-layout
+                        tab.style.tableLayout = "auto";
+                        tab.style.tableLayout = "fixed";
+                    } else if (elem.style.height) {
+                        elem.style.height = "";
+                    } else {
+                        // do nothing
+                    }
+
+                };
+
+                var i = 0;
+                var tab = document.getElementById("tabTrend");
+                while (tab.firstChild) {
+                    tab.removeChild(tab.firstChild);
+                }
+
+                r.reverse();
+                for (i; i < 4; i++) { // 4 rows inside the table
+                    var row = tab.insertRow(-1);
+                    r.forEach(function(rw, rwIdx) {
+                        // Column Header
+                        /*if (rwIdx == 0) { 
+                        	lblCol(row, i);
+                        }
+                        */
+
+                        // Cells information
+                        var cell = row.insertCell(-1); //document.createElement("td");
+                        if (i == 0) { // table header
+                            cell.innerHTML = rw.year + " - " + rw.month;
+                            cell.className = "tdHead";
+                        } else if (i == 1) { // Positive value
+                            cell.innerHTML = rw.positive;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "positive",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else if (i == 2) { // Neutral value
+                            cell.innerHTML = rw.neutral;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "neutral",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else { // Negative value
+                            cell.innerHTML = rw.negative;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "negative",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        }
+                    });
+                }
+                sbResize();
+            };
+
+            var trending = function getTrending(r) {
+                var divTab = document.getElementById("trendTabCont");
+                while (divTab.firstChild) {
+                    divTab.removeChild(divTab.firstChild);
+                }
+
+                var lblCol = function createColTitle(tabElem, idx) {
+                    var cell = tabElem.insertCell(-1);
+                    if (idx == 0) { // table header
+                        cell.innerHTML = "";
+                    } else if (idx == 1) { // Positive value
+                        cell.innerHTML = "Positive";
+                    } else if (idx == 2) { // Neutral value
+                        cell.innerHTML = "Neutral";
+                    } else { // Negative value
+                        cell.innerHTML = "Negative";
+                    }
+                    cell.className = "tdHead";
+                };
+
+                var i = 0;
+                var tab = document.createElement("table");
+                tab.id = "trendTab";
+                r.reverse();
+                for (i; i < 4; i++) { // 4 rows inside the table
+                    var row = tab.insertRow(-1);
+                    r.forEach(function(rw, rwIdx) {
+                        // Column Header
+                        //if (rwIdx>5) {return;}
+                        if (rwIdx == 0) {
+                            lblCol(row, i);
+                        }
+
+                        // Cells information
+                        var cell = row.insertCell(-1); //document.createElement("td");
+                        if (i == 0) { // table header
+                            cell.innerHTML = rw.year + "-" + ((rw.month > 9) ? rw.month : "0" + rw.month);
+                            cell.className = "tdHead";
+                        } else if (i == 1) { // Positive value
+                            cell.innerHTML = rw.positive;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "positive",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else if (i == 2) { // Neutral value
+                            cell.innerHTML = rw.neutral;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "neutral",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else { // Negative value
+                            cell.innerHTML = rw.negative;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "negative",
+                                    "month": rw.month,
+                                    "year": rw.year,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        }
+                    });
+                }
+                divTab.appendChild(tab);
+            };
+
+            var dayTrending = function getDayTrending(r) {
+                var divTab = document.getElementById("trendTabCont");
+                while (divTab.firstChild) {
+                    divTab.removeChild(divTab.firstChild);
+                }
+
+                var lblCol = function createColTitle(tabElem, idx) {
+                    var cell = tabElem.insertCell(-1);
+                    if (idx == 0) { // table header
+                        cell.innerHTML = "";
+                    } else if (idx == 1) { // Positive value
+                        cell.innerHTML = "Positive";
+                    } else if (idx == 2) { // Neutral value
+                        cell.innerHTML = "Neutral";
+                    } else { // Negative value
+                        cell.innerHTML = "Negative";
+                    }
+                    cell.className = "tdHead";
+                };
+
+                var i = 0;
+                var tab = document.createElement("table");
+                tab.id = "trendTab";
+
+                for (i; i < 4; i++) { // 4 rows inside the table
+                    var row = tab.insertRow(-1);
+                    r.forEach(function(rw, rwIdx) {
+                        // Column Header
+                        //if (rwIdx>5) {return;}
+                        if (rwIdx == 0) {
+                            lblCol(row, i);
+                        }
+
+                        // Cells information
+                        var cell = row.insertCell(-1); //document.createElement("td");
+                        if (i == 0) { // table header
+                            cell.innerHTML = rw.date;
+                            cell.className = "tdHead";
+                        } else if (i == 1) { // Positive value
+                            cell.innerHTML = rw.positive;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "positive",
+                                    "date": rw.date,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else if (i == 2) { // Neutral value
+                            cell.innerHTML = rw.neutral;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "neutral",
+                                    "date": rw.date,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        } else { // Negative value
+                            cell.innerHTML = rw.negative;
+                            cell.onclick = function ncClick() {
+                                var param = {
+                                    "type": "trending",
+                                    "sentiment": "negative",
+                                    "date": rw.date,
+                                    "keyword": rw.keyword
+                                };
+                                return function() {
+                                    clickH(param);
+                                };
+                            }();
+                        }
+                    });
+                }
+                divTab.appendChild(tab);
+            };
+
+            summary(data.overall);
+            //trending(data.trending);
+            dayTrending(data.dayTrending);
+        }
+
+        var clickH = function clickHandler(paramObj) {
+            var link = "%25cspapp.bi.iknow.sentimentlistingv2.cls";
+            callBackFunc = "",
+                parameters = "",
+                width = "800",
+                height = "600",
+                windowParam = "toolbar=no, menubar=no, resizable=yes, scrollbars=yes";
+
+            if (paramObj !== "undefined") {
+                link += "?type=" + paramObj["type"];
+                for (var key in paramObj) {
+                    if (key !== "type") {
+                        link += "&" + key + "=" + paramObj[key];
+                    }
+                }
+            }
+
+            if (speedModalDialog && typeof speedModalDialog === "function") {
+                speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+            }
+        };
+
+        function getSelectedValue(selectElemId) {
+            var val,
+                s = document.getElementById(selectElemId);
+
+            if (s && s.nodeName === "SELECT") {
+                val = s.options[s.selectedIndex].value;
+            }
+            return val;
+        }
+
+        function showCloud() {
+            var domId, type, bl, keyword, data, catArray, category,
+                maxWord, thisCat, mainCat = "",
+                subCat = "",
+                showNoSentiment;
+            // bl = getSelectedValue("blSel"); // will enable this again once blacklist is ready
+            bl = "";
+
+            keyword = document.getElementById("txtKeyword").value;
+            showNoSentiment = document.getElementById("chkShowPureNeutral").checked ? 1 : 0;
+            type = getSelectedValue("sentType");
+            maxWord = getSelectedValue("cloudNo");
+            thisCat = getSelectedValue("ddMainCat");
+            if (thisCat != "" && thisCat.split("||")[0] == "m") {
+                mainCat = thisCat.split("||")[1];
+                subCat = "";
+            }
+            if (thisCat != "" && thisCat.split("||")[0] == "s") {
+                subCat = thisCat.split("||")[1];
+                mainCat = "";
+            }
+
+            // Date filter;
+            var dtFrom = document.getElementById("txtDateFrm").value;
+            var dtTo = document.getElementById("txtDateTo").value;
+            // data = $.parseJSON(#server(%BI.iKnow.iKnow.GenCloud(type, "", "", "", subCat, dtFrom, dtTo, maxWord, mainCat, showNoSentiment))#);
+            genCloud(data);
+
+            var noSentLabel = document.getElementById("lblNoSent");
+            if (type == "sentTS") {
+                noSentLabel.style.display = "none";
+            } else {
+                noSentLabel.style.display = "";
+            }
+
+            var noSentLegend = document.getElementById("noSentimentLegend");
+            if (showNoSentiment) {
+                noSentLegend.style.display = "";
+            } else {
+                noSentLegend.style.display = "none";
+            }
+
+        }
+
+        function genCloud(list) {
+            var cloudList,
+
+                // Onclick handler when user click on cloud terms
+                // Will obtain all relevant sentences and populate the table below
+                clickHandler = function getListing(txt) { // get Sentence based on entity ID
+                    //alert(txt);
+                    var filters = getFilters();
+                    var param = {
+                        "type": "cloud",
+                        "entity": txt
+                    };
+                    param = extend(param, filters);
+                    clickH(param);
+                },
+
+                summaryHandler = function showSummary(o) {
+
+                    // Update the number in the selected word table
+                    var freqCont = document.getElementById("cntFreqTxt");
+                    var spreadCont = document.getElementById("cntSpreadTxt");
+                    var domCont = document.getElementById("cntDomTxt");
+                    var posCont = document.getElementById("cntPosTxt");
+                    var negCont = document.getElementById("cntNegTxt");
+                    var neuCont = document.getElementById("cntNeuTxt");
+
+                    freqCont.innerHTML = o.freq;
+                    spreadCont.innerHTML = o.spread;
+                    domCont.innerHTML = o.dominance;
+                    posCont.innerHTML = o.positive;
+                    negCont.innerHTML = o.negative;
+                    neuCont.innerHTML = o.neutral;
+
+                    // Update the table header with selected word
+                    var wrapper = document.getElementById("selectedWordWrapper");
+                    var selectedText = document.getElementById("txtSelectedWord");
+                    selectedText.innerHTML = o.text;
+                    wrapper.style.display = "inline";
+
+                    // Attach onclick event to the button
+                    var btnViewWordDetail = document.getElementById("btnViewWordDetail");
+                    btnViewWordDetail.onclick = function() {
+                        clickHandler(o.text);
+                    };
+
+                },
+
+                // Return CSS class name for coloring terms in cloud
+                sentClass = function getSentiment(s) { // s as Sentiment Value
+                    var sentClass;
+                    sentClass = s;
+                    /*if (s > 0) {
+                    	sentClass = "positive"; 
+                    }
+                    else if (s < 0) {
+                    	sentClass = "negative";
+                    }
+                    else {
+                    	sentClass = "neutral";
+                    }*/
+                    return sentClass;
+                },
+
+                // Returns html attribute for the cloud
+                htmlAtt = function buildHTMLAtt(sentiment, entId, title) {
+                    var o = {};
+                    if (sentiment !== "undefined") {
+                        o["class"] = sentClass(sentiment);
+                    }
+                    if (entId !== "undefined") {
+                        o["data_entId"] = entId;
+                    }
+                    if (title !== "undefined") {
+                        o["title"] = title;
+                    }
+                    return o;
+                },
+
+                // Generate object to be passed to word cloud
+                retCloudElem = function buildElemCloud(col) {
+                    var html, handlers,
+                        text = col.text,
+                        weight = Math.abs(col.weight),
+                        hl = "entity" + String.fromCharCode(2) + "pathPos" + String.fromCharCode(3) + "pathNeg";
+
+                    // Title of element is based on cloud selection
+                    var txtTitle = function() {
+                        var elemVal = getSelectedValue("sentType"),
+                            txt;
+                        if (elemVal === "sentD") {
+                            txt = "Dominance: " + col.dominance;
+                        } else if (elemVal === "sentF") {
+                            txt = "Frequency: " + col.freq;
+                        } else if (elemVal === "sentS") {
+                            txt = "Spread: " + col.spread;
+                        } else if (elemVal === "sentDS") {
+                            txt = "Dominance: " + col.dominance + " * " + col.spread;
+                        } else if (elemVal === "sentTS") {
+                            txt = ((col.sentimentClass === "p3") ? "Positive" : "Negative") +
+                                ": " +
+                                ((col.sentimentClass === "p3") ? col.positive : col.negative);
+                        } else { /* do nothing */ }
+                        return txt;
+                    }();
+
+                    // setting html attribute
+                    html = htmlAtt(col.sentimentClass, col.entId, txtTitle);
+
+                    // setting event handler for terms (closure form)
+                    handlers = function(o) {
+                        return {
+                            //click: function() { clickHandler(t); },
+                            // Add more event here
+                            click: function() {
+                                summaryHandler(o);
+                            }
+                        }
+                    }(col); // missing class for css highlighting
+
+                    // Return value for each of list element
+                    return {
+                        text: text,
+                        html: html,
+                        handlers: handlers,
+                        weight: weight
+                    };
+                };
+
+            if (list && list !== null && list !== "undefined") {
+                cloudList = list.map(retCloudElem);
+                //console.log(cloudList);
+                document.getElementById("wCloud2").innerHTML = "";
+                $("#wCloud2").jQCloud(cloudList, {
+                    width: 750,
+                    height: 500,
+                    removeOverflowing: true,
+                    shape: "rectangle"
+                });
+                switchLegend();
+            }
+        }
+
+        function switchLegend() {
+            var legendType = getSelectedValue("sentType");
+            var legendAll = document.getElementById("cloudLegend");
+            var legendTS = document.getElementById("cloudLegendTS");
+            if (legendType == "sentTS") {
+                legendAll.style.display = "none";
+                legendTS.style.display = "inline-block";
+            } else {
+                legendAll.style.display = "inline-block";
+                legendTS.style.display = "none";
+            }
+        }
+
+        function refreshResult() {
+            var keyword = document.getElementById("txtKeyword").value;
+            var dateFrom = document.getElementById("txtDateFrm").value;
+            var dateTo = document.getElementById("txtDateTo").value;
+            var thisCat = getSelectedValue("ddMainCat");
+
+            var mainCat = "",
+                subCat = "";
+            if (thisCat.split("||")[0] == "m") {
+                mainCat = thisCat.split("||")[1];
+                subCat = "";
+            }
+            if (thisCat.split("||")[0] == "s") {
+                mainCat = "";
+                subCat = thisCat.split("||")[1];
+            }
+            // var d = $.parseJSON(#server(%BI.iKnow.iKnow.GenSummary("", keyword, dateFrom, dateTo, mainCat, subCat))#);
+            genResult(d);
+            showCloud();
+            drawChart();
+            removeOverflow();
+        }
+
+        function init() {
+            generateCategory();
+            //var d = $.parseJSON(#server(%BI.iKnow.iKnow.GenSummary())#);
+            genResult(d);
+        }
+
+        function openCalendar(objElem) {
+            var date = objElem.value;
+            var link = "%25cspapp.bi.calendar.cls" + ((date !== "") ? "?currDataDatePass=" + date : ""),
+                callBackFunc = "popDate",
+                parameters = objElem.id,
+                width = "300",
+                height = "200",
+                top = (document.body.clientHeight / 2 - 100),
+                left = (document.body.clientWidth / 2 - 150),
+                windowParam = "toolbar='no', menubar='no', resizable='yes', scrollbars='yes', top=" + top + ", left=" + left + "";
+
+            if (speedModalDialog && typeof speedModalDialog === "function") {
+                speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+            }
+        }
+
+        function popDate(date, objId) {
+            var dateObj = document.getElementById(objId);
+            dateObj.value = date;
+        }
+
+        function clearFilter() {
+            var keyword = document.getElementById("txtKeyword"),
+                dtFrom = document.getElementById("txtDateFrm"),
+                dtTo = document.getElementById("txtDateTo");
+
+            keyword.value = "";
+            dtFrom.value = "";
+            dtTo.value = "";
+        }
+
+        function toggleCht() {
+            var checkDisp = function checkDisplay(element) {
+                return (element.currentStyle) ? element.currentStyle.display : getComputedStyle(element, null).display;
+            }
+            var chtGraph = document.getElementById("d1trendCht");
+            var cht = document.getElementById("trendCht");
+            var tab = document.getElementById("trendTabCont");
+            var btn = document.getElementById("btnChtToggle");
+            var btnCProp = document.getElementById("btnChtProp");
+            var chtDisp = checkDisp(cht),
+                tabDisp = checkDisp(tab);
+
+            if (chtDisp === "none") {
+                cht.style.display = "block";
+                tab.style.display = "none";
+                btnCProp.style.display = "block";
+                // btn.innerHTML = "#($$$Text("Details"))#";
+                if (chtGraph && chtGraph.style.height === "0px") {
+                    drawChart();
+                    removeOverflow();
+                }
+            } else {
+                cht.style.display = "none";
+                tab.style.display = "block";
+                btnCProp.style.display = "none";
+                // btn.innerHTML = "#($$$Text("Chart"))#";
+            }
+        }
+
+        function resizeChart() {}
+
+        function generateCategory() {
+            var drpCat = document.getElementById("ddMainCat");
+            // var data = $.parseJSON(#server(%BI.iKnow.iKnow.GetCategoryList())#);
+            data.forEach(function(main) {
+                var optgroup = document.createElement("optgroup");
+                optgroup.label = main.mainName;
+
+                var allOpt = document.createElement("option");
+                allOpt.value = main.mainId;
+                allOpt.text = "All";
+                allOpt.data_type = "m";
+                optgroup.appendChild(allOpt);
+
+                main.sub.forEach(function(sub) {
+                    var childOpt = document.createElement("option");
+                    childOpt.text = sub.subName;
+                    childOpt.value = sub.subId;
+                    childOpt.data_type = "c";
+
+                    optgroup.appendChild(childOpt);
+                });
+
+                drpCat.appendChild(optgroup);
+            });
+        }
+    </script>
+    <!--JS END-->
+
+    <title> Sentiment Module </title>
+
+    <!--CSS Definition Start-->
+    <link rel="stylesheet" href="webStyle.css" type="text/css">
+    <link rel="stylesheet" href="css/style.css" type="text/css">
+    <link rel="stylesheet" href="css/jqcloud.css" type="text/css">
+    <script language=cache runat=server>
+        // d loadThemeCSS^%bi.SWr.WebThemeEdit
+    </script>
+    <!-- #include file = "../general.csp" -->
+    <!-- #include file = "../chart.csp" -->
+    <link rel="stylesheet" href="css/wordcloud.css" type="text/css">
+    <style>
+        /*Custom page style*/
+        
+        body {
+            overflow: auto;
+        }
+        
+        .titleBar {
+            padding: 5px 0px 5px 10px;
+            height: 25px;
+            width: 100%;
+        }
+        
+        .button {
+            width: 80px;
+            height: 18px;
+        }
+        
+        input[type="text"] {
+            height: 18px;
+            padding-left: 3px;
+        }
+        
+        table#trendTab {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%
+        }
+        
+        table#trendTab td {
+            border: 1px solid #cccccc;
+            padding: 3px 5px 3px 5px;
+            min-width: 60px;
+            width: 80px;
+        }
+        
+        table#trendTab td:first-child {
+            width: 100px;
+        }
+        
+        button#btnChtProp {
+            float: right;
+            margin-top: -3px;
+            margin-right: 3px;
+            width: 120px;
+        }
+        
+        button#btnChtToggle,
+        button#btnViewWordDetail {
+            float: right;
+            margin-top: -3px;
+            margin-right: 3px;
+        }
+        
+        div#contSumm,
+        div#contTrend,
+        div#contWC,
+        div#contFilter,
+        div#contTrendC {
+            width: 100%;
+        }
+        
+        div.con {
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+        
+        div.mainCon {
+            width: 70%;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+        }
+        
+        div#wCloud2 {
+            height: 500px;
+            width: 750px;
+            /*border: 1px solid #dddddd;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	position:relative;*/
+            overflow: auto;
+            display: inline-block;
+        }
+        
+        div#cloudLegend,
+        div#cloudLegendTS {
+            height: 350px;
+            width: 155px;
+            padding-top: 25px;
+            float: right;
+            display: inline-block;
+        }
+        
+        div#cloudLegendTS {
+            display: none;
+        }
+        
+        div#trendCht {
+            width: 100%;
+            height: 300px;
+        }
+        
+        label {
+            display: inline;
+            margin: 5px;
+        }
+        
+        input#txtKeyword {
+            width: 200px;
+        }
+        
+        button#btnRefRes,
+        button#btnClear {
+            margin-left: 10px;
+        }
+        
+        td.tdHead {
+            font-weight: bold;
+            background-color: rgb(230, 238, 243);
+        }
+        
+        .titleRight {
+            float: right;
+            margin-top: -5px;
+            margin-right: 5px;
+        }
+        
+        span.titleRight select {
+            width: 120px;
+        }
+        
+        table#tabTrend td {
+            width: 80px;
+        }
+        
+        div#trendTabCont {
+            display: none;
+        }
+        
+        div.legColorBox {
+            width: 12px;
+            height: 12px;
+            float: left;
+            margin-right: 3px;
+        }
+        
+        .inlineDiv {
+            display: inline-block;
+        }
+        
+        .P3 {
+            background-color: #006400;
+        }
+        
+        .P2 {
+            background-color: #008000;
+        }
+        
+        .P1 {
+            background-color: #90EE90;
+        }
+        
+        .PN0 {
+            background-color: #ADD8E6;
+        }
+        
+        .noSent {
+            background-color: #A9A9A9;
+        }
+        
+        .N1 {
+            background-color: #ef3d47;
+        }
+        
+        .N2 {
+            background-color: #ff0000;
+        }
+        
+        .N3 {
+            background-color: #8B0000;
+        }
+        
+        .statCount {
+            width: 100px;
+        }
+        
+        span#selectedWordWrapper {
+            display: none;
+        }
+        
+        span#txtSelectedWord {
+            font-style: italic;
+        }
+        
+        div#wCloud2 span {
+            cursor: pointer;
+        }
+    </style>
+    <!--CSS Definition End-->
+</head>
+
+<body>
+    <div class="divMnHdr top"><span>#($$$Text("Sentiment Module"))#</span></div>
+    <div class="mainCon">
+        <div id="contFilter" class="con bdrStyle">
+            <div class="titleBar titleTxt">#($$$Text("Filter"))#</div>
+            <table class="tblGrid">
+                <tr>
+                    <td style="white-space:normal">
+                        <label for="ddMainCat">
+				<span>#($$$Text("Category"))#</span>
+				<select id="ddMainCat" style="width: 100px;"/>
+					<!--option value="">#($$$Text("All"))#</option>
+					<!-- Will replace this with automated category>
+					<option value="7">#($$$Text("Twitter"))#</option>
+					<option value="s||10003">#($$$Text("General Comments"))#</option>
+					<option value="s||10004">#($$$Text("HRSSC Comments"))#</option>
+					<option value="10">#($$$Text("Comments"))#</option>
+					<option value="s||10001">#($$$Text("Newspaper"))#</option>
+					<option value="s||10002">#($$$Text("Comments"))#</option-->
+				</select>
+			</label>
+                        <label for="txtKeyword">
+				<span>#($$$Text("Keyword"))#</span>
+				<input id="txtKeyword" class="txtField" type="text" placeholder="Insert keyword here..." />
+			</label>
+                        <label for="txtDateFrm">
+				<span>#($$$Text("Duration From"))#</span>
+				<input id="txtDateFrm" class="txtField" type="text" onclick="openCalendar(this);" />
+			</label>
+                        <label for="txtDateTo">
+				<span>#($$$Text("To"))#</span>
+				<input id="txtDateTo" class="txtField" type="text" onclick="openCalendar(this);" />
+			</label>
+                        <button id="btnRefRes" class="button" onclick="refreshResult()">#($$$Text("Refresh"))#</button>
+                        <button id="btnClear" class="button" onclick="clearFilter()">#($$$Text("Clear"))#</button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div id="contSumm" class="con bdrStyle">
+            <div class="titleBar titleTxt">#($$$Text("Summary"))#</div>
+            <table id="tabSumm" class="tblGrid">
+                <thead>
+                    <tr>
+                        <td>#($$$Text("Positive"))#</td>
+                        <td>#($$$Text("Neutral"))#</td>
+                        <td>#($$$Text("Negative"))#</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="cntSPos">1</td>
+                        <td id="cntSNeu">2</td>
+                        <td id="cntSNeg">3</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <!--div id="contTrend" class="con bdrStyle">
+		<div id="trendBar" class="titleBar titleTxt" style="width:100%;position:relative">#($$$Text("Trending"))#</div>
+		<div id="trendTabCont" style="overflow:auto;width:100%;position:relative"></div>
+	</div-->
+        <div id="contTrendC" class="con bdrStyle">
+            <div id="trendBar" class="titleBar titleTxt">
+                <span style="float:left">#($$$Text("Trending"))#</span>
+                <button id="btnChtToggle" onclick="toggleCht()" class="button">#($$$Text("Details"))#</button>
+                <button id="btnChtProp" onclick="openProp()" class="button">#($$$Text("Chart Properties"))#</button>
+                <div style="clear:both"></div>
+            </div>
+            <div id="trendCht"></div>
+            <div id="trendTabCont" style="overflow:auto;width:100%;position:relative"></div>
+        </div>
+        <div id="contWC" class="con bdrStyle">
+            <div class="titleBar titleTxt">
+                <span style="float:left">#($$$Text("Word Cloud"))#</span>
+                <span class="titleRight">
+				<label for="cloudNo">#($$$Text("Max. Entity"))#
+					<select id="cloudNo" onchange="showCloud()">
+						<option value="20">#($$$Text("20"))#</option>
+						<option value="30">#($$$Text("30"))#</option>
+						<option value="50">#($$$Text("50"))#</option>
+						<option value="100" selected>#($$$Text("100"))#</option>
+					</select>
+				</label>
+				<label for="sentType">#($$$Text("Type"))#
+					<select id="sentType" onchange="showCloud()">
+						<!--option value="sentD">#($$$Text("Dominance"))#</option-->
+						<option value="sentF">#($$$Text("Frequency"))#</option>
+						<option value="sentTS">#($$$Text("Top Sentiment"))#</option>
+						<option value="sentS">#($$$Text("Spread"))#</option>
+						<option value="sentDS">#($$$Text("Dominance"))#</option>
+					</select>
+				</label>
+				<label id="lblNoSent" for="chkShowPureNeutral">#($$$Text("No Sentiment Entity?"))#
+					<input type="checkbox" id="chkShowPureNeutral" onchange="showCloud()" />
+				</label>
+			</span>
+            </div>
+            <!--div id="cloud" style="height:95%"-->
+            <div id="cloud" style="width:100%">
+                <div id="wCloud2"></div>
+                <div id="cloudLegend">
+                    <div>
+                        <div class="legColorBox P3 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Very Positive"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox P2 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Positive"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox P1 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Least Positive"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox PN0 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Neutral (With Sentiment)"))#</span></div>
+                    </div>
+                    <div id="noSentimentLegend">
+                        <div class="legColorBox noSent inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Neutral (No Sentiment)"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox N1 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Least Negative"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox N2 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Negative"))#</span></div>
+                    </div>
+                    <div>
+                        <div class="legColorBox N3 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Very Negative"))#</span></div>
+                    </div>
+                </div>
+                <div id="cloudLegendTS">
+                    <div>
+                        <div class="legColorBox P3 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Positive"))#</span></div>
+                    </div>
+
+                    <div>
+                        <div class="legColorBox N3 inlineDiv"></div>
+                        <div class="inlineDiv"><span>#($$$Text("Negative"))#</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="contSelectedWord" class="con bdrStyle">
+            <div class="titleBar titleTxt">
+                <span style="float:left">#($$$Text("Selected Word"))#</span>
+                <span id="selectedWordWrapper">
+				&nbsp;-&nbsp;
+				<span id="txtSelectedWord">THE WORD</span>
+                </span>
+                <button id="btnViewWordDetail" class="button">#($$$Text("Details"))#</button>
+                <div style="clear:both"></div>
+            </div>
+            <div id="selectedWord">
+                <table id="tabSumm" class="tblGrid">
+                    <thead>
+                        <tr>
+                            <td colspan=2>#($$$Text("Statistic"))#</td>
+                            <td colspan=2>#($$$Text("Sentiment"))#</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="trO">
+                            <td>#($$$Text("Frequency"))#</td>
+                            <td class="statCount" id="cntFreqTxt">0</td>
+                            <td>#($$$Text("Positive"))#</td>
+                            <td class="statCount" id="cntPosTxt">0</td>
+                        </tr>
+                        <tr>
+                            <td>#($$$Text("Spread"))#</td>
+                            <td class="statCount" id="cntSpreadTxt">0</td>
+                            <td>#($$$Text("Negative"))#</td>
+                            <td class="statCount" id="cntNegTxt">0</td>
+                        </tr>
+                        <tr class="trO">
+                            <td>#($$$Text("Dominance"))#</td>
+                            <td class="statCount" id="cntDomTxt">0</td>
+                            <td>#($$$Text("Neutral"))#</td>
+                            <td class="statCount" id="cntNeuTxt">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script type="text/javascript">
+    // Event bindings
+    window.onload = function() {
+        init();
+        showCloud();
+        drawChart();
+        //removeOverflow();
+    };
+
+    var timerId = window.setInterval(removeOverflow, 2000);
+    window.onresize = function() {
+        //$("#wCloud2").css('width', 'auto');
+        drawChart();
+        timerId = window.setInterval(removeOverflow, 2000);
+        removeOverflow();
+    };
+
+    function drawChart() {
+        var tid = "trendCht";
+        var tpStr = "";
+        var daDoc = document;
+
+        var parentDIV = document.getElementById(tid);
+        parentDIV.innerHTML = tpStr;
+
+        var chartHeight = parentDIV.offsetHeight;
+        if (parentDIV.style.borderWidth != "") {
+            chartHeight -= (parseInt(parentDIV.style.borderWidth) * 2)
+        }
+        if (chartHeight < 0) {
+            chartHeight = 0;
+        }
+        myMAIN = daDoc.createElement("TABLE");
+        myMAIN.style.width = "100%";
+        myMAIN.style.height = "100%";
+        myMAIN.style.padding = "0px 0px 0px 0px";
+        myMAIN.setAttribute("cellSpacing", "0px");
+        myMAIN.setAttribute("cellPadding", "0px");
+        myMAINTB = daDoc.createElement("TBODY");
+
+        myMAINTR = daDoc.createElement("TR");
+        chartWidth = parentDIV.offsetWidth;
+        var chartDIV = daDoc.createElement("DIV");
+        var chartID = tid + "_chart";
+        chartDIV.setAttribute("id", chartID);
+        chartDIV.style.height = chartHeight + "px";
+        chartDIV.style.width = "100%";
+        myMAINTDR = daDoc.createElement("TD");
+        myMAINTDR.style.width = "100%";
+        myMAINTDR.style.height = "100%";
+        myMAINTDR.appendChild(chartDIV);
+        myMAINTDR.vAlign = "top";
+        myMAINTR.appendChild(myMAINTDR);
+
+        myMAINTB.appendChild(myMAINTR);
+        myMAIN.appendChild(myMAINTB);
+        parentDIV.appendChild(myMAIN);
+
+        chtDIVH = chartDIV.offsetHeight;
+        chtDIVW = chartDIV.offsetWidth;
+        useTheme = 0, dDwnLVL = 0, sentimentMode = 1;
+        if (document.getElementById(tid + "_chart")) {
+            // #server(%BI.WebChartList.drawChart(tid,1,chtDIVH,chtDIVW,dDwnLVL,tid,useTheme,sentimentMode))#;
+        }
+    }
+
+    function removeOverflow() {
+        // have to externally remove the overflow of chart legend
+        //alert("www");
+        var lgnd = document.getElementById("d1trendCht");
+        var lgnd2 = document.getElementById("d2trendCht");
+        var remoflw = function remOF(elem) {
+            if (elem && elem.style.overflow === "auto") {
+                elem.style.overflow = "hidden";
+                //elem.style.borderRight = "1px solid #cccccc";
+                clearInterval(timerId);
+            }
+            if (elem && elem.style.overflow === "hidden") {
+                clearInterval(timerId);
+            }
+        };
+        remoflw(lgnd);
+        remoflw(lgnd2);
+
+    }
+
+    function returnTitle(tid2) {
+        //return;
+        var DDCheck = tid2.split("DD");
+        if (typeof DDCheck[1] != "undefined") {
+            return "none";
+        }
+        var name = eval("Grid_" + tid2 + "[13]");
+        var name2 = name.split(dlC4);
+        // var title =	#server(%BI.SVGAnnotation.returnTitle(name2[0]))#;
+        alert(title);
+        return title;
+    }
+
+    function openProp() {
+        // edit hardcoded scheme at %bi.SWRc.WebColorScheme, function genSentimentColorSkim
+        var link = "%25cspapp.bi.chtprop2.cls?pivId=|trendCht&sentimentMode=1";
+        callBackFunc = "",
+            parameters = "",
+            width = "800",
+            height = "600",
+            windowParam = "toolbar=no, menubar=no, resizable=yes, scrollbars=yes";
+
+        if (speedModalDialog && typeof speedModalDialog === "function") {
+            speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+        }
+    }
+</script>
+
+</html>

@@ -192,7 +192,7 @@
                             text: ""
                         }, {
                             value: "c",
-                            text: "Category",
+                            text: "Sub Category",
                             f: catFunc
                         }, {
                             value: "t",
@@ -673,6 +673,7 @@
         }
 
         function loadDefSent() {
+            return; // 26012018 - function is now obsolete due to requirement change
             var disableInput = function(enable) {
                 var tableToDisable = ["tabDictEntry", "tabDictList"];
                 tableToDisable.forEach(function(tbl) {
@@ -722,8 +723,13 @@
             // get index sentiment
             // var idxSenti = document.getElementById("chkforSenti").checked;
 
-            // use default sentiment
-            var UseDefSent = document.getElementById("chkDefSent").checked;
+            // use default sentiment or external file
+            var filePath = document.getElementById("txtFilePath");
+            var extFileId = 0;
+            var UseDefSent = document.getElementById("radDefSent").checked;
+            if (!UseDefSent && typeof(txtFilePath.data_selected) != "undefined") {
+                extFileId = txtFilePath.data_selected.id;
+            }
 
             var folder = "";
             var folderObj = document.getElementById("txtFolder");
@@ -747,7 +753,8 @@
                 DomainId: domid,
                 DictTerm: dict,
                 RegExp: regex,
-                Folder: folder
+                Folder: folder,
+                CustomFileDict: extFileId
             };
 
             var strSetting = JSON.stringify(setting);
@@ -859,12 +866,17 @@
             // set input dict
             loadDict(data.DictTerm);
 
-            // Disable area for default sentiment
-            var chkUseDefSent = document.getElementById("chkDefSent");
+            // Sentiment Dictionary
+            var radDefSent = document.getElementById("radDefSent");
+            var radFile = document.getElementById("radFile");
             if (data.UseDefaultDict) {
-                chkUseDefSent.checked = true;
+                radDefSent.checked = true;
+            } else {
+                radFile.checked = true;
+                updateFileInfo(data.CustomFileDict.id, data.CustomFileDict);
+                toggleDictSrc();
             }
-            loadDefSent();
+            //loadDefSent();
 
             // set input regex
             loadExpr(data.RegExp);
@@ -1048,6 +1060,83 @@
                 }
             }
         }
+
+        // For external dictionary
+        function browseDictFile() {
+            var link = "%25cspapp.bi.attachment.cls?callBack=updateFileInfo&fileExt=txt|csv|TXT|CSV|tsv|TSV",
+                callBackFunc = "updateFileInfo",
+                parameters = "",
+                width = "480",
+                height = "150",
+                windowParam = "center=yes,status=no,scroll=no,help=no,resizable=no";
+
+            if (speedModalDialog && typeof speedModalDialog === "function") {
+                speedModalDialog(link, callBackFunc, parameters, width, height, windowParam);
+            }
+        }
+
+        function updateFileInfo(fileId, data) {
+            var appendFile = function(r) {
+                var txtFilePath = document.getElementById("txtFilePath");
+                txtFilePath.value = r.fileName;
+                txtFilePath.data_selected = {
+                    id: r.id,
+                    fName: r.fileName,
+                    url: r.url
+                };
+            };
+
+            var upload;
+            if (fileId != 0) {
+                if (!data) {
+                    console.log(fileId);
+                    upload = data;
+                    //upload = JSON.parse(#server(%BI.iKnow.TextIndexer.GetAttachmentDetails(fileId))#);
+                    appendFile(upload);
+                } else {
+                    appendFile(data);
+                }
+            }
+
+        }
+
+        function toggleDictSrc() {
+            var toggleDisabled = function(f) {
+                var cont = document.getElementById("fileCont");
+                for (var i = 0; i < cont.children.length; i++) {
+                    if (f) {
+                        cont.children[i].setAttribute("disabled", "disabled");
+                    } else {
+                        cont.children[i].removeAttribute("disabled");
+                    }
+                }
+            };
+
+            var radios = document.getElementsByName("dictRadio");
+            for (var i = 0; i < radios.length; i++) {
+                if (radios[i].checked == true && radios[i].id == "radDefSent") {
+                    toggleDisabled(true);
+                    return;
+                } else {
+                    toggleDisabled(false);
+                    return;
+                }
+            }
+        }
+
+        function lockKMDomain() {
+            var chkToKM = document.getElementById("chkToKM");
+            var dropDomain = document.getElementById("domainSel");
+            if (chkToKM.checked == true) {
+                for (var i = 0; i < dropDomain.options.length; i++) {
+                    if (dropDomain.options[i].text == "KM") {
+                        dropDomain.selectedIndex = i;
+                        dropDomain.setAttribute("disabled", "disabled");
+                        dropDomain.onchange();
+                    }
+                }
+            }
+        }
     </script>
     <link rel=stylesheet type="text/css" href="css/rptStyle.css">
     <link rel=stylesheet type="text/css" href="css/style.css">
@@ -1133,7 +1222,7 @@
     </style>
 </head>
 
-<body onload="sTab('d1','d2,d3,d4'); loadDomainList();">
+<body>
     <div class="fullSize">
         <table class="fullSize" cellpadding="0" cellspacing="0">
             <tr style="vertical-align:middle;">
@@ -1204,12 +1293,12 @@
                                                         <button class="button catBtn" onclick="showDB()">Database</button>
                                                     </td>
                                                     <td colspan="2">
-                                                        <input type="checkbox" id="chkToKM" checked/><label for="chkToKM">Push to Knowledge Base</label>
+                                                        <input type="checkbox" id="chkToKM" onclick="lockKMDomain()" checked/><label for="chkToKM">Push to Knowledge Base</label>
                                                     </td>
                                                 </tr>
                                                 <tr>
                                                     <td>
-                                                        <span class="inputLabel">Category:</span>
+                                                        <span class="inputLabel">Main Category:</span>
                                                     </td>
                                                     <td>
                                                         <input type="text" id="txtCategory" class="txtField" style="width:250px;" />
@@ -1252,9 +1341,9 @@
                         </div>
 
                         <!--
-							Domain Selection
-							TODO: 1) Domain Creation/Info
-						-->
+              Domain Selection
+              TODO: 1) Domain Creation/Info
+            -->
                         <div id=d2 class="tabDiv fullSize">
                             <table class="fullSize" cellpadding="5" cellspacing="0">
                                 <tr>
@@ -1310,10 +1399,10 @@
                         </div>
 
                         <!--
-							Pre Processing
-							TODO: 1) Include Regex Entry
-								  2) Include User Dictionary
-						-->
+              Pre Processing
+              TODO: 1) Include Regex Entry
+                  2) Include User Dictionary
+            -->
                         <div id=d3 class="tabDiv fullSize">
                             <table class="fullSize" cellpadding="3" cellspacing="5">
                                 <tr>
@@ -1369,16 +1458,35 @@
                                             <table class="fullSize" cellpadding="3" cellspacing="0">
                                                 <tr style="vertical-align: middle;" class="titleBar">
                                                     <td style="height:30px;">User Dictionary</td>
-                                                    <td>
+                                                    <!-- <td>
                                                         <div style="float:right;padding-right: 5px;">
                                                             <input type="checkbox" name="defSent" id="chkDefSent" onclick="loadDefSent()">
                                                             <label for="chkDefSent">Use Default Sentiment</label>
                                                         </div>
-                                                    </td>
+                                                    </td> -->
                                                 </tr>
                                                 <tr>
-                                                    <td colspan="2" style="height:150px;">
+                                                    <td style="height:150px;">
                                                         <table class="fullSize" cellpadding="0" cellspacing="0" id="tabDictEntry">
+                                                            <tr>
+                                                                <td>Load Dictionary:</td>
+                                                                <td>
+                                                                    <div>
+                                                                        <input type="radio" name="dictRadio" id="radDefSent" onclick="toggleDictSrc()" checked>
+                                                                        <label for="radDefSent">Default Sentiment</label>
+                                                                    </div>
+                                                                    <div>
+                                                                        <input type="radio" name="dictRadio" id="radFile" onclick="toggleDictSrc()"><label for="radFile">From File</label>
+                                                                        <span id="fileCont">
+                                                                            <button class="button" onclick="browseDictFile()">Browse</button>
+                                                                            <input type="text" class="txtField" name="fileOtherSrc" id="txtFilePath" style="width: 150px;">
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td colspan="2">Override / Add More Terms</td>
+                                                            </tr>
                                                             <tr>
                                                                 <td style="width: 10%;">Term:</td>
                                                                 <td><input type="text" name="txtDictOri" id="txtDictOri" class="txtField" style="width: 99%;" /></td>
@@ -1405,7 +1513,7 @@
                                                     </td>
                                                 </tr>
                                                 <tr>
-                                                    <td colspan="2" style="height:100%">
+                                                    <td style="height:100%">
                                                         <div style="overflow-y:auto;overflow-x:hidden;position:relative;height:100%;width:100%;padding:3px;">
                                                             <table id="tabDictList" class="tblGrid" cellpadding="2" cellspacing="0" style="position:absolute;top:0px;left:0px;width: 100%;">
                                                                 <thead>
@@ -1428,10 +1536,10 @@
                             </table>
                         </div>
                         <!--
-							Review
-							TODO: 1) Show All Settings
-								  2) Indexing Logs
-						-->
+              Review
+              TODO: 1) Show All Settings
+                  2) Indexing Logs
+            -->
                         <div id="d4" class="tabDiv fullSize">
                             <table class="fullSize" cellpadding="5" cellspacing="0">
                                 <tr>
@@ -1471,5 +1579,12 @@
         </table>
     </div>
 </body>
+<script type="text/javascript">
+    window.onload = function() {
+        sTab('d1', 'd2,d3,d4');
+        loadDomainList();
+        lockKMDomain();
+    };
+</script>
 
 </html>
